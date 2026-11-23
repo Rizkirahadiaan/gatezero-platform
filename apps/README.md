@@ -29,4 +29,4 @@ yang paling kecil permukaannya: satu API Go, satu worker, satu Postgres.
 Kontras yang menarik untuk demo: bandingkan ukuran & jumlah CVE image `golang:1.24` (builder)
 vs `distroless/static` (runtime) di laporan Trivy.
 
-> Status: **stub**. Implementasi kode saat fase 3.
+> **Status:** belum ada kode. Item `A1`-`A7` di [ROADMAP](../ROADMAP.md).

@@ -1,0 +1,11 @@
+# Overlay STAGING — auto-sync, tag image SAMA dengan yang akan naik ke prod.
+# Tujuannya menguji apa yang benar-benar akan dirilis, bukan versi lain.
+#
+# Path ini juga dirujuk oleh platform/gitops/.sops.yaml
+# (creation_rules: overlays/staging/*.enc.yaml).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: apps-staging
+
+resources: []

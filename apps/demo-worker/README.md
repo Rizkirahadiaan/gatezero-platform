@@ -17,4 +17,4 @@ Tujuan keberadaannya di portofolio:
 - Tanpa shell di image (`distroless/static`).
 - Metrik: `jobs_processed_total`, `job_duration_seconds`, `queue_depth`.
 
-> Status: **stub**.
+> **Status:** belum diimplementasikan. Item `A2` di [ROADMAP](../../ROADMAP.md).

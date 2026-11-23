@@ -117,4 +117,4 @@ Semua keputusan besar terdokumentasi sebagai ADR: [`docs/adr/`](docs/adr/).
 
 ## 9. Lisensi
 
-MIT (kecuali disebutkan lain).
+MIT — lihat [`LICENSE`](LICENSE).

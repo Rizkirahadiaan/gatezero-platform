@@ -1,0 +1,7 @@
+# Overlay DEV — auto-sync, satu reviewer, boleh berubah kapan saja.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: apps-dev
+
+resources: []

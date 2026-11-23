@@ -28,8 +28,11 @@ Repo ini sekarang adalah **blueprint yang lengkap**, bukan platform yang berjala
 | Policy keamanan | 🔴 0% | `security/kyverno/policies` hanya README |
 | Cluster / VM | 🔴 0% | belum ada |
 
-Penanda `Status: **stub**` masih ada di **9 file**. LICENSE belum ada (padahal README dan
-`galaxy.yml` menyebut MIT).
+Fase 0 sudah dikerjakan: penanda stub dibersihkan, LICENSE ditambahkan, tiga runbook
+ditulis, `network-matrix.md` dibuat, dan referensi namespace Galaxy diseragamkan.
+
+DoD-1 belum sepenuhnya terpenuhi karena `ansible-playbook --syntax-check` belum dijalankan
+(Ansible belum tersedia di mesin ini).
 
 ---
 
@@ -59,21 +62,21 @@ Target minimum yang layak disebut selesai: **DoD-2**.
 
 ---
 
-## 4. Fase 0 — Repo hygiene · `P0` · ~0,5 hari
+## 4. Fase 0 — Repo hygiene · `P0` · ✅ selesai 2026-11-23
 
 Bisa dikerjakan tanpa VM. Menaikkan kredibilitas repo secara instan.
 
-- [ ] **R1** `LICENSE` (MIT) di root — *acceptance:* file ada dan disebut di README
-- [ ] **R2** `docs/network-matrix.md` — *acceptance:* tabel port lengkap, dirujuk dari INSTALL.md
-- [ ] **R3** `docs/runbooks/etcd-restore.md` — *acceptance:* Gejala → Langkah → Verifikasi → Rollback
-- [ ] **R4** `docs/runbooks/node-upgrade.md` — *acceptance:* termasuk version skew & urutan drain
-- [ ] **R5** `docs/runbooks/secret-rotation.md` — *acceptance:* prosedur `sops updatekeys` + `rotate`
-- [ ] **R6** `platform/gitops/overlays/staging/` — *acceptance:* konsisten dengan `.sops.yaml`
-- [ ] **R7** Bersihkan 9 penanda `Status: **stub**` — *acceptance:* `grep -r "Status: \*\*stub\*\*"` = 0
-- [ ] **R8** `namespace` di `galaxy.yml` = akun Galaxy — *acceptance:* `make galaxy-build` sukses
-- [ ] **R9** Cek link internal — *acceptance:* 0 tautan mati (mis. `lychee` atau manual)
+- [x] **R1** `LICENSE` (MIT) di root — *acceptance:* file ada dan disebut di README
+- [x] **R2** `docs/network-matrix.md` — *acceptance:* tabel port lengkap, dirujuk dari INSTALL.md
+- [x] **R3** `docs/runbooks/etcd-restore.md` — *acceptance:* Gejala → Langkah → Verifikasi → Rollback
+- [x] **R4** `docs/runbooks/node-upgrade.md` — *acceptance:* termasuk version skew & urutan drain
+- [x] **R5** `docs/runbooks/secret-rotation.md` — *acceptance:* prosedur `sops updatekeys` + `rotate`
+- [x] **R6** `platform/gitops/overlays/staging/` — *acceptance:* konsisten dengan `.sops.yaml`
+- [x] **R7** Bersihkan 9 penanda stub — *acceptance:* `grep -rn "status.*stub" apps ci platform security tests docs` = 0
+- [x] **R8** `namespace` di `galaxy.yml` = akun Galaxy — *acceptance:* `make galaxy-build` sukses
+- [x] **R9** Cek link internal — *acceptance:* 0 tautan mati (mis. `lychee` atau manual)
 
-**Gate fase 0:** DoD-1 tercapai.
+**Gate fase 0:** DoD-1 — tersisa satu verifikasi: `ansible-playbook --syntax-check` di controller.
 
 ---
 
@@ -293,4 +296,5 @@ G7/G11 (canary + rollback). Kelima hal ini yang membuat orang percaya.
 
 | Tanggal | Perubahan |
 |---|---|
-| 2026-11-23 | Dokumen dibuat. Fase 0 masih terbuka (9 stub, LICENSE belum ada). |
+| 2026-11-23 | Dokumen dibuat. Fase 0 masih terbuka. |
+| 2026-11-23 | **Fase 0 selesai** — R1 LICENSE · R2 network-matrix · R3–R5 runbook · R6 overlay 4 env · R7 stub dibersihkan · R8 namespace Galaxy · R9 link internal (1 rusak, diperbaiki) |

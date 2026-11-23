@@ -27,4 +27,4 @@ securityContext:
 
 Tanpa ini, Kyverno akan menolak workload di namespace `apps`.
 
-> Status: **stub**.
+> **Status:** chart belum ada. Item `A7` di [ROADMAP](../../ROADMAP.md).

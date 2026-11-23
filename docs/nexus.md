@@ -54,4 +54,4 @@ stringData:
   .dockerconfigjson: '{"auths":{"nexus.kirahadian.local:8082":{"auth":"..."}}}'
 ```
 
-> Status: **stub**. Isi setelah fase 2 dikerjakan.
+> **Status:** instalasi belum dijalankan. Item `S3`-`S5` di [ROADMAP](../ROADMAP.md).

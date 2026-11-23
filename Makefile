@@ -87,7 +87,7 @@ galaxy-build: ## Build collection Ansible Galaxy
 
 .PHONY: galaxy-publish
 galaxy-publish: ## Publish ke Ansible Galaxy (butuh ANSIBLE_GALAXY_API_KEY)
-	cd platform/bootstrap/ansible && ansible-galaxy collection publish ./gatezero-kubeadm_bootstrap-*.tar.gz
+	cd platform/bootstrap/ansible && ansible-galaxy collection publish ./rizkirahadiaan-kubeadm_bootstrap-*.tar.gz
 
 ## ---------- supply chain ----------
 

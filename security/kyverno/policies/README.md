@@ -30,4 +30,4 @@ kyverno apply security/kyverno/policies/ \
   --resource platform/gitops/overlays/dev/ --policy-report
 ```
 
-> Status: **stub**. Policy dibuat saat fase 6.
+> **Status:** policy belum ada. Item `E1`-`E2` di [ROADMAP](../../../ROADMAP.md).

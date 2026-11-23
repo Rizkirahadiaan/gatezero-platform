@@ -33,4 +33,4 @@ CI build -> push ke Nexus -> commit tag baru ke overlays/<env>/kustomization.yam
 
 CI **tidak** memegang kredensial cluster. Ini inti dari pull-based deployment.
 
-> Status: **stub**. Application manifest diisi saat fase 5 dikerjakan.
+> **Status:** manifest belum ada. Item `G3`-`G9` di [ROADMAP](../../ROADMAP.md).

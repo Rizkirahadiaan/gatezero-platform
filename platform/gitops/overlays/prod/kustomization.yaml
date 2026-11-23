@@ -1,0 +1,8 @@
+# Overlay PROD — SYNC MANUAL, dua reviewer, tidak ada auto-prune.
+# Secret memakai key prod + root (break-glass) — lihat platform/gitops/.sops.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: apps-prod
+
+resources: []

@@ -628,7 +628,7 @@ Kita pakai **collection** karena berisi 10 role yang saling bergantung.
 ### 11.2 Yang ada di `galaxy.yml`
 
 ```yaml
-namespace: gatezero            # ← HARUS sama dengan namespace akun Galaxy kamu
+namespace: rizkirahadiaan            # ← HARUS sama dengan namespace akun Galaxy kamu
 name: kubeadm_bootstrap
 version: 0.1.0                 # ← naikkan setiap publish (immutable)
 dependencies:
@@ -667,14 +667,14 @@ ansible-galaxy collection build --force
 Output:
 
 ```
-Created collection for gatezero.kubeadm_bootstrap at
-/path/platform/bootstrap/ansible/gatezero-kubeadm_bootstrap-0.1.0.tar.gz
+Created collection for rizkirahadiaan.kubeadm_bootstrap at
+/path/platform/bootstrap/ansible/rizkirahadiaan-kubeadm_bootstrap-0.1.0.tar.gz
 ```
 
 Isi tarball bisa diperiksa:
 
 ```bash
-tar tzf gatezero-kubeadm_bootstrap-0.1.0.tar.gz | head -30
+tar tzf rizkirahadiaan-kubeadm_bootstrap-0.1.0.tar.gz | head -30
 ```
 
 Pastikan **tidak ada** `inventory/`, `secrets.env`, atau `artifacts/`.
@@ -687,7 +687,7 @@ Ini langkah yang sering dilewatkan. Build bisa "sukses" tapi tetap tidak bisa di
 mkdir -p /tmp/galaxy-test && cd /tmp/galaxy-test
 
 ansible-galaxy collection install \
-  /path/platform/bootstrap/ansible/gatezero-kubeadm_bootstrap-0.1.0.tar.gz \
+  /path/platform/bootstrap/ansible/rizkirahadiaan-kubeadm_bootstrap-0.1.0.tar.gz \
   -p ./collections
 
 # buat playbook uji minimal
@@ -696,7 +696,7 @@ cat > test.yml <<'EOF'
   gather_facts: false
   tasks:
     - ansible.builtin.debug:
-        msg: "{{ lookup('ansible.builtin.fileglob', './collections/ansible_collections/gatezero/kubeadm_bootstrap/roles/*') }}"
+        msg: "{{ lookup('ansible.builtin.fileglob', './collections/ansible_collections/rizkirahadiaan/kubeadm_bootstrap/roles/*') }}"
 EOF
 
 ANSIBLE_COLLECTIONS_PATH=./collections ansible-playbook test.yml
@@ -716,7 +716,7 @@ ansible-doc -t role -l -p ./collections 2>/dev/null | head
 cd platform/bootstrap/ansible
 
 ansible-galaxy collection publish \
-  ./gatezero-kubeadm_bootstrap-0.1.0.tar.gz \
+  ./rizkirahadiaan-kubeadm_bootstrap-0.1.0.tar.gz \
   --api-key "$ANSIBLE_GALAXY_API_KEY"
 ```
 
@@ -726,19 +726,19 @@ Sukses:
 Collection has been successfully published to Ansible Galaxy.
 ```
 
-Cek di: `https://galaxy.ansible.com/ui/repo/published/gatezero/kubeadm_bootstrap/`
+Cek di: `https://galaxy.ansible.com/ui/repo/published/rizkirahadiaan/kubeadm_bootstrap/`
 
 ### 11.7 Pakai di proyek lain
 
 ```bash
-ansible-galaxy collection install gatezero.kubeadm_bootstrap
+ansible-galaxy collection install rizkirahadiaan.kubeadm_bootstrap
 ```
 
 `requirements.yml` proyek lain:
 
 ```yaml
 collections:
-  - name: gatezero.kubeadm_bootstrap
+  - name: rizkirahadiaan.kubeadm_bootstrap
     version: ">=0.1.0"
 ```
 
@@ -748,8 +748,8 @@ Playbook:
 - hosts: k8s_cluster
   become: true
   roles:
-    - gatezero.kubeadm_bootstrap.common
-    - gatezero.kubeadm_bootstrap.containerd
+    - rizkirahadiaan.kubeadm_bootstrap.common
+    - rizkirahadiaan.kubeadm_bootstrap.containerd
 ```
 
 ### 11.8 Aturan versi

@@ -40,4 +40,4 @@ Konfigurasi & material untuk membangun cluster HA dengan kubeadm.
 | containerd | `2.x` | repo Docker |
 | kube-vip | `0.8.x` | tag image |
 
-> Catat versi final yang dipakai di [`../../README.md`](../../README.md) setelah instalasi.
+> Catat versi final yang dipakai di [`../../../README.md`](../../../README.md) setelah instalasi.

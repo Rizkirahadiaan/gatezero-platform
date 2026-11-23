@@ -52,4 +52,4 @@ untuk `prod` gunakan `@sha256:...`.
 - `govulncheck` (opsional, cepat) sebelum Trivy
 - SBOM Syft dari image final
 
-> Status: **stub**.
+> **Status:** belum diimplementasikan. Item `A1`, `A3`-`A5` di [ROADMAP](../../ROADMAP.md).

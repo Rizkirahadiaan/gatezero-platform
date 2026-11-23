@@ -43,4 +43,4 @@ k6/
 | k6 smoke | p95 < 500 ms (post-deploy) |
 | k6 load | p95 < 200 ms, error < 1% (nightly) |
 
-> Status: **stub**.
+> **Status:** test belum ada. Item `A4`-`A6` di [ROADMAP](../ROADMAP.md).

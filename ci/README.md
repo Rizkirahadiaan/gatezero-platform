@@ -45,4 +45,4 @@ scripts/
 └── bump-gitops.sh       # update image tag di repo GitOps
 ```
 
-> Status: **stub**. Diisi saat fase 3 dikerjakan.
+> **Status:** template belum ada. Item `C2`-`C11` di [ROADMAP](../ROADMAP.md).

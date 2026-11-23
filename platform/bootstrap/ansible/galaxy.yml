@@ -2,12 +2,12 @@
 # Metadata koleksi Ansible Galaxy.
 #
 # Build:   ansible-galaxy collection build --force
-# Publish: ansible-galaxy collection publish ./gatezero-kubeadm_bootstrap-*.tar.gz \
+# Publish: ansible-galaxy collection publish ./rizkirahadiaan-kubeadm_bootstrap-*.tar.gz \
 #            --api-key "$ANSIBLE_GALAXY_API_KEY"
 #
 # ⚠️ namespace HARUS sama dengan username/namespace akun Galaxy kamu.
-#    Ganti "gatezero" di bawah sebelum publish.
-namespace: gatezero
+#    Diset ke "rizkirahadiaan" (namespace akun GitHub/Galaxy).
+namespace: rizkirahadiaan
 name: kubeadm_bootstrap
 version: 0.1.0
 readme: README.md

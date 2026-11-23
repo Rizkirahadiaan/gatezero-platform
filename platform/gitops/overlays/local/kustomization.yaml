@@ -1,0 +1,12 @@
+# Overlay LOCAL — cluster di laptop/VM tunggal untuk eksperimen.
+# Tidak untuk produksi. Secret di sini boleh memakai key dev (ADR-0005).
+#
+# resources diisi saat Fase 7 (ROADMAP G5):
+#   - ../../charts/demo-api
+#   - ../../charts/demo-worker
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: apps-dev
+
+resources: []
