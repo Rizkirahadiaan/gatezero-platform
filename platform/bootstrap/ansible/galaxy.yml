@@ -34,10 +34,10 @@ dependencies:
   kubernetes.core: ">=5.0.0"
   ansible.posix: ">=1.5.0"
   community.general: ">=9.0.0"
-repository: https://gitlab.gatezero.lab/platform/gatezero-platform
-documentation: https://gitlab.gatezero.lab/platform/gatezero-platform/-/blob/main/platform/bootstrap/ansible/README.md
-homepage: https://gitlab.gatezero.lab/platform/gatezero-platform
-issues: https://gitlab.gatezero.lab/platform/gatezero-platform/-/issues
+repository: https://github.com/Rizkirahadiaan/gatezero-platform
+documentation: https://github.com/Rizkirahadiaan/gatezero-platform/blob/main/platform/bootstrap/ansible/README.md
+homepage: https://github.com/Rizkirahadiaan/gatezero-platform
+issues: https://github.com/Rizkirahadiaan/gatezero-platform/issues
 
 # JANGAN ikutkan hal yang bersifat site-specific atau rahasia.
 build_ignore:
