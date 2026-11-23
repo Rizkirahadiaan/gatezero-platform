@@ -1,9 +1,11 @@
 # Dokumentasi
 
-| Folder | Isi |
+| Folder / file | Isi |
 |---|---|
+| [`../ROADMAP.md`](../ROADMAP.md) | checklist penyelesaian + acceptance criteria |
 | `adr/` | Architecture Decision Record — kenapa, bukan apa |
 | `runbooks/` | langkah operasional saat insiden / perubahan |
+| `nexus.md` | Nexus OSS sebagai artifact hub |
 | `architecture.drawio` | diagram arsitektur (buka di draw.io / VS Code extension) |
 
 ## Kenapa ADR

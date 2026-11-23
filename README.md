@@ -62,6 +62,13 @@ Diagram detail: [`docs/architecture.drawio`](docs/architecture.drawio).
 
 ## 4. Roadmap
 
+> **Checklist eksekusi lengkap** — per item, dengan acceptance criteria, dependency,
+> estimasi, dan Definition of Done:
+> **[`ROADMAP.md`](ROADMAP.md)**
+>
+> Ringkasnya: repo ini sudah lengkap sebagai *blueprint* (dokumentasi + otomasi),
+> tetapi belum ada kode aplikasi, pipeline nyata, manifest GitOps, atau cluster yang berjalan.
+
 | Fase | Isi | Status |
 |---|---|---|
 | 0 | Foundation: VM, hardening OS, kubeadm HA, Cilium | ⬜ |
