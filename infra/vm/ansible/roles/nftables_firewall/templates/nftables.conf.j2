@@ -1,0 +1,57 @@
+#!/usr/sbin/nft -f
+#
+# Dikelola Ansible (role nftables_firewall). Jangan edit manual.
+#
+# `flush ruleset` menghapus SEMUA aturan nftables di host ini. Pada node
+# Kubernetes ini aman karena Cilium memakai eBPF (bukan iptables/nft) dan
+# kube-proxy tidak dipasang. Jangan pakai role ini bersamaan dengan Docker
+# yang mengelola iptables sendiri tanpa menguji dulu.
+
+flush ruleset
+
+define ADMIN_NETS   = { {{ firewall_admin_cidrs | join(', ') }} }
+define CLUSTER_NETS = { {{ firewall_cluster_cidrs | join(', ') }} }
+
+table inet filter {
+  chain input {
+    type filter hook input priority 0; policy drop;
+
+    iif lo accept
+    ct state established,related accept
+    ct state invalid drop
+
+    ip protocol icmp accept
+    ip6 nexthdr ipv6-icmp accept
+
+    # --- management plane ---
+    tcp dport {{ firewall_ssh_port }} ip saddr $ADMIN_NETS accept
+
+{% if firewall_allowed_from_world_tcp | default([]) | length > 0 %}
+    # --- layanan publik (sengaja terbuka) ---
+    tcp dport { {{ firewall_allowed_from_world_tcp | join(', ') }} } accept
+{% endif %}
+{% if firewall_allowed_tcp | default([]) | length > 0 %}
+    # --- port layanan dari jaringan cluster ---
+    tcp dport { {{ firewall_allowed_tcp | join(', ') }} } ip saddr $CLUSTER_NETS accept
+{% endif %}
+{% if firewall_allowed_udp | default([]) | length > 0 %}
+    udp dport { {{ firewall_allowed_udp | join(', ') }} } ip saddr $CLUSTER_NETS accept
+{% endif %}
+{% if firewall_extra_allowed_tcp | default([]) | length > 0 %}
+    # --- port tambahan dari jaringan admin ---
+    tcp dport { {{ firewall_extra_allowed_tcp | join(', ') }} } ip saddr $ADMIN_NETS accept
+{% endif %}
+{% if firewall_log_dropped | bool %}
+    limit rate 5/minute log prefix "nft-drop: " level warn
+{% endif %}
+    counter drop
+  }
+
+  chain forward {
+    type filter hook forward priority 0; policy drop;
+  }
+
+  chain output {
+    type filter hook output priority 0; policy accept;
+  }
+}

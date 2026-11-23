@@ -1,0 +1,12 @@
+---
+aide_enabled: true
+aide_init_timeout: 1800
+aide_exclude_paths:
+  - /var/log
+  - /var/lib/containerd
+  - /var/lib/kubelet
+  - /var/lib/etcd
+  - /var/lib/prometheus
+  - /var/cache
+  - /tmp
+  - /var/tmp

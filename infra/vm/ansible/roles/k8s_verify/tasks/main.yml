@@ -1,0 +1,193 @@
+---
+# ============================================================================
+# Bagian 1: pemeriksaan per-node (file & socket). Aman di semua node.
+# ============================================================================
+
+- name: Baca KubeletConfiguration
+  ansible.builtin.slurp:
+    src: /var/lib/kubelet/config.yaml
+  register: kubelet_raw
+  failed_when: false
+
+- name: Parse KubeletConfiguration
+  ansible.builtin.set_fact:
+    kubelet_cfg: "{{ kubelet_raw.content | b64decode | from_yaml }}"
+  when: not kubelet_raw.failed
+
+- name: Gagal kalau kubelet belum terkonfigurasi
+  ansible.builtin.assert:
+    that:
+      - not kubelet_raw.failed
+    fail_msg: >-
+      /var/lib/kubelet/config.yaml tidak ada. Node ini belum menjalankan kubeadm.
+    success_msg: "KubeletConfiguration ditemukan"
+
+- name: Periksa kubelet hardening
+  ansible.builtin.assert:
+    that:
+      - kubelet_cfg.readOnlyPort | default(1) | int == 0
+      - kubelet_cfg.protectKernelDefaults | default(false) | bool
+      - kubelet_cfg.seccompDefault | default(false) | bool
+      - kubelet_cfg.rotateCertificates | default(false) | bool
+      - kubelet_cfg.serverTLSBootstrap | default(false) | bool
+      - kubelet_cfg.authorization.mode | default('') | lower == 'webhook'
+      - kubelet_cfg.authentication.anonymous.enabled | default(true) | bool == false
+    fail_msg: >-
+      KubeletConfiguration belum sesuai. readOnlyPort={{ kubelet_cfg.readOnlyPort | default('?') }},
+      seccompDefault={{ kubelet_cfg.seccompDefault | default('?') }},
+      rotateCertificates={{ kubelet_cfg.rotateCertificates | default('?') }}.
+      Perbaiki di platform/bootstrap/ansible lalu jalankan
+      `kubeadm upgrade node phase kubelet-config`.
+    success_msg: "KubeletConfiguration sesuai baseline"
+
+- name: Cek port read-only kubelet (10255) tidak listen
+  ansible.builtin.shell: |
+    set -eu
+    ss -tln | grep -c ':10255' || true
+  args:
+    executable: /bin/bash
+  register: port_10255
+  changed_when: false
+
+- name: Gagal kalau 10255 terbuka
+  ansible.builtin.assert:
+    that:
+      - port_10255.stdout | trim | int == 0
+    fail_msg: "kubelet read-only port 10255 masih terbuka — temuan CIS klasik"
+    success_msg: "Port 10255 tertutup"
+
+- name: Cek permission socket containerd
+  ansible.builtin.stat:
+    path: /run/containerd/containerd.sock
+  register: containerd_sock
+
+- name: Pastikan socket containerd tidak world-writable
+  ansible.builtin.assert:
+    that:
+      - containerd_sock.stat.exists
+      - containerd_sock.stat.mode in ['0660', '0600']
+    fail_msg: >-
+      Socket containerd mode {{ containerd_sock.stat.mode | default('?') }}.
+      Siapa pun yang bisa menulis socket ini = root di node.
+    success_msg: "Socket containerd {{ containerd_sock.stat.mode }}"
+
+# --- etcd hanya di control plane ----------------------------------------
+
+- name: Cek permission data dir etcd
+  ansible.builtin.stat:
+    path: "{{ k8s_expected_etcd_mount }}"
+  register: etcd_dir
+  when: inventory_hostname in groups['k8s_control_plane'] | default([])
+
+- name: Pastikan data dir etcd 0700
+  ansible.builtin.assert:
+    that:
+      - etcd_dir.stat.mode == '0700'
+      - etcd_dir.stat.pw_name == 'root'
+    fail_msg: >-
+      {{ k8s_expected_etcd_mount }} mode {{ etcd_dir.stat.mode | default('?') }}
+      owner {{ etcd_dir.stat.pw_name | default('?') }}. Harus 0700 root.
+  when: inventory_hostname in groups['k8s_control_plane'] | default([])
+
+- name: Cek etcd berada di filesystem terpisah dari root
+  ansible.builtin.shell: |
+    set -eu
+    root_src=$(findmnt -n -o SOURCE /)
+    etcd_src=$(findmnt -n -o SOURCE {{ k8s_expected_etcd_mount }} || echo MISSING)
+    if [ "$root_src" = "$etcd_src" ]; then echo SHARED; else echo SEPARATE; fi
+  args:
+    executable: /bin/bash
+  register: etcd_mount_check
+  changed_when: false
+  when:
+    - inventory_hostname in groups['k8s_control_plane'] | default([])
+    - k8s_require_separate_etcd_disk | default(true) | bool
+
+- name: Pastikan etcd punya disk terpisah
+  ansible.builtin.assert:
+    that:
+      - etcd_mount_check.stdout is search('SEPARATE')
+    fail_msg: >-
+      /var/lib/etcd satu filesystem dengan /. Image pull akan memblokir fsync
+      etcd dan memicu leader flapping (ADR-0009).
+  when:
+    - inventory_hostname in groups['k8s_control_plane'] | default([])
+    - k8s_require_separate_etcd_disk | default(true) | bool
+
+# ============================================================================
+# Bagian 2: pemeriksaan cluster. Hanya di control plane pertama.
+# ============================================================================
+
+- name: Pemeriksaan level cluster
+  when: inventory_hostname == groups['k8s_control_plane'][0]
+  block:
+    - name: Ambil argumen kube-apiserver
+      ansible.builtin.shell: |
+        set -eu
+        kubectl --kubeconfig {{ kubeconfig_path }} -n kube-system get pod \
+          -l component=kube-apiserver \
+          -o jsonpath='{.items[0].spec.containers[0].command}'
+      args:
+        executable: /bin/bash
+      register: apiserver_args
+      changed_when: false
+      failed_when: false
+
+    - name: Pastikan apiserver hardening aktif
+      ansible.builtin.assert:
+        that:
+          - apiserver_args.stdout is search('anonymous-auth')
+          - apiserver_args.stdout is search('"false"')
+          - apiserver_args.stdout is search('encryption-provider-config')
+          - apiserver_args.stdout is search('NodeRestriction')
+        fail_msg: >-
+          Argumen apiserver belum lengkap. Periksa platform/bootstrap/ansible
+          roles/kubeadm/templates/kubeadm-config.yaml.j2 lalu jalankan ulang.
+          Argumen saat ini: {{ apiserver_args.stdout }}
+        success_msg: "apiserver: anonymous-auth=false, encryption, NodeRestriction"
+
+    - name: Cek kube-proxy tidak terpasang
+      ansible.builtin.shell: |
+        set -eu
+        if kubectl --kubeconfig {{ kubeconfig_path }} -n kube-system get ds kube-proxy >/dev/null 2>&1; then
+          echo PRESENT
+        else
+          echo ABSENT
+        fi
+      args:
+        executable: /bin/bash
+      register: kube_proxy
+      changed_when: false
+
+    - name: Pastikan kube-proxy absen (Cilium replacement)
+      ansible.builtin.assert:
+        that:
+          - kube_proxy.stdout is search('ABSENT')
+        fail_msg: "kube-proxy masih ada. Cilium seharusnya menggantikannya."
+
+    - name: Cek label PSA namespace aplikasi
+      ansible.builtin.shell: |
+        set -eu
+        kubectl --kubeconfig {{ kubeconfig_path }} get ns -o json \
+          | jq -r '.items[]
+              | select(.metadata.name | startswith("apps-"))
+              | .metadata.name + "=" + (.metadata.labels["pod-security.kubernetes.io/enforce"] // "none")'
+      args:
+        executable: /bin/bash
+      register: psa_labels
+      changed_when: false
+      failed_when: false
+
+    - name: Pastikan namespace aplikasi memakai PSA restricted
+      ansible.builtin.assert:
+        that:
+          - psa_labels.stdout_lines | length > 0
+          - psa_labels.stdout_lines | select('search', '(?<!restricted)$') | list | length == 0
+        fail_msg: >-
+          Label PSA belum benar: {{ psa_labels.stdout_lines }}.
+          Harus `restricted` untuk semua apps-*.
+        success_msg: "PSA restricted aktif di {{ psa_labels.stdout_lines | length }} namespace"
+
+- name: Ringkasan verifikasi
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: kubelet OK, socket OK{{ ', etcd OK' if inventory_hostname in groups['k8s_control_plane'] | default([]) else '' }}"

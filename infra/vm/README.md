@@ -32,8 +32,9 @@ Alasan urutan:
 
 ## Prinsip
 
-1. **Hardening adalah kode, bukan tindakan manual.** Semua yang di dokumen ini harus
-   berakhir di Ansible. Kalau hanya diketik di server, ia akan hilang saat rebuild.
+1. **Hardening adalah kode, bukan tindakan manual.** Semua yang di dokumen ini sudah
+   diimplementasikan di [`ansible/`](ansible/). Kalau hanya diketik di server, ia akan
+   hilang saat rebuild.
 2. **Setiap pengecualian wajib punya mitigasi pengganti.** "Tidak bisa" bukan alasan.
    Lihat [`docs/adr/0010`](../../docs/adr/0010-cis-hardening-exceptions.md).
 3. **Jangan mengejar 100% CIS.** Skor 100% pada node yang berfungsi lebih buruk daripada
@@ -45,9 +46,9 @@ Alasan urutan:
 | Komponen | Status |
 |---|---|
 | Dokumen + perintah | ✅ ada (3 file ini) |
-| Role Ansible `infra/vm/ansible` | ⬜ belum dibuat |
-| Tailoring USG (`usg/tailoring.xml`) | ⬜ belum dibuat |
-| Job kube-bench terjadwal | ⬜ belum dibuat |
-| Dashboard tren skor | ⬜ belum dibuat |
+| Role Ansible [`ansible/`](ansible/) | ✅ 11 role, 3 playbook |
+| Tailoring USG (`usg/tailoring.xml`) | ⬜ masih manual, lihat `CIS-BENCHMARK.md` §2.4 |
+| Job kube-bench terjadwal | ⬜ manifest ada di dokumen, belum diotomasi |
+| Dashboard tren skor | ⬜ metrik sudah dikirim, dashboard belum |
 
-Sampai role Ansible ada, dokumen ini yang menjadi acuan eksekusi manual.
+Sampai role Ansible matang, dokumen ini tetap menjadi acuan bila terjadi selisih.

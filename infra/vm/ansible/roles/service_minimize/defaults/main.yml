@@ -1,0 +1,5 @@
+---
+# Default: hanya service yang DINONAKTIFKAN (reversibel).
+# Penghapusan paket harus opt-in per host.
+service_minimize_disable: []
+service_minimize_remove: []

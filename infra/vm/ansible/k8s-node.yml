@@ -1,0 +1,8 @@
+---
+- name: "Overlay node Kubernetes"
+  hosts: k8s_nodes
+  become: true
+  gather_facts: true
+  roles:
+    - k8s_sysctl
+    - k8s_verify

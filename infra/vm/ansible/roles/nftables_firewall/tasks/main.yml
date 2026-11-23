@@ -1,0 +1,111 @@
+---
+# Lapis 8: firewall host (nftables).
+#
+# ⚠️ Role ini bisa memutus akses. Pengaman yang dipasang:
+#   1. menolak admin_cidrs kosong atau 0.0.0.0/0
+#   2. memvalidasi sintaks dengan `nft -c` SEBELUM menerapkan
+#   3. koneksi SSH yang sedang berjalan dilindungi `ct state established`
+
+- name: Pastikan firewall_admin_cidrs diisi dengan aman
+  ansible.builtin.assert:
+    that:
+      - firewall_admin_cidrs | length > 0
+      - "'0.0.0.0/0' not in firewall_admin_cidrs"
+      - "'::/0' not in firewall_admin_cidrs"
+    fail_msg: >-
+      firewall_admin_cidrs kosong atau terlalu luas. Isi dengan subnet admin
+      (mis. 10.10.20.0/24). Tanpa ini, SSH bisa terkunci.
+    success_msg: "CIDR admin: {{ firewall_admin_cidrs | join(', ') }}"
+
+- name: Pastikan port penting node k8s ada di allowlist
+  ansible.builtin.assert:
+    that:
+      - 6443 in firewall_allowed_tcp | default([])
+      - 8472 in firewall_allowed_udp | default([])
+    fail_msg: >-
+      Node k8s wajib mengizinkan 6443/tcp (apiserver) dan 8472/udp (VXLAN).
+      Lihat platform/bootstrap/kubeadm/INSTALL.md bagian 3.
+  when: inventory_hostname in groups['k8s_nodes'] | default([])
+
+- name: Install nftables
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+
+- name: Pastikan ufw tidak aktif (konflik dengan nftables/Cilium)
+  ansible.builtin.command: ufw status
+  register: ufw_status
+  changed_when: false
+  failed_when: false
+
+- name: Gagal kalau ufw aktif
+  ansible.builtin.fail:
+    msg: >-
+      ufw aktif di {{ inventory_hostname }}. Matikan dulu:
+      `ufw disable` — ufw dan nftables/Cilium berebut aturan.
+  when: ufw_status.stdout is search('Status: active')
+
+- name: Simpan ruleset saat ini sebagai backup
+  ansible.builtin.shell: |
+    set -eu
+    mkdir -p /var/backups/nftables
+    nft list ruleset > "/var/backups/nftables/pre-hardening-$(date +%Y%m%dT%H%M%S).nft" || true
+    ls -t /var/backups/nftables/*.nft | tail -n +6 | xargs -r rm -f
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Template konfigurasi nftables
+  ansible.builtin.template:
+    src: nftables.conf.j2
+    dest: /etc/nftables.conf
+    owner: root
+    group: root
+    mode: "0600"
+  notify: reload nftables
+
+- name: Validasi sintaks nftables
+  ansible.builtin.command: nft -c -f /etc/nftables.conf
+  register: nft_check
+  changed_when: false
+  failed_when: nft_check.rc != 0
+
+- name: Aktifkan layanan nftables
+  ansible.builtin.service:
+    name: nftables
+    state: started
+    enabled: true
+
+- name: Terapkan ruleset sekarang
+  ansible.builtin.command: nft -f /etc/nftables.conf
+  changed_when: false
+
+# --- verifikasi ----------------------------------------------------------
+
+- name: Baca ruleset aktif
+  ansible.builtin.command: nft list ruleset
+  register: nft_ruleset
+  changed_when: false
+
+- name: Pastikan kebijakan input adalah drop
+  ansible.builtin.assert:
+    that:
+      - nft_ruleset.stdout is search('hook input')
+      - nft_ruleset.stdout is search('policy drop')
+    fail_msg: "Ruleset tidak aktif atau policy bukan drop"
+    success_msg: "Firewall aktif (input policy drop)"
+
+- name: Pastikan aturan SSH ada
+  ansible.builtin.assert:
+    that:
+      - nft_ruleset.stdout is search('dport ' ~ firewall_ssh_port)
+    fail_msg: "Tidak ada aturan untuk port SSH {{ firewall_ssh_port }} — berisiko terkunci"
+    success_msg: "Aturan SSH {{ firewall_ssh_port }} ada"
+
+- name: Tampilkan ringkasan firewall
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: input drop, SSH {{ firewall_ssh_port }} dari
+      {{ firewall_admin_cidrs | join(', ') }},
+      {{ firewall_allowed_tcp | default([]) | length }} port cluster,
+      {{ firewall_allowed_from_world_tcp | default([]) | length }} port publik

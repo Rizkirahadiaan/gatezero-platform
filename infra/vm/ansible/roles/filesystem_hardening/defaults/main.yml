@@ -1,0 +1,14 @@
+---
+# Lapis 4: filesystem.
+
+filesystem_tmp_noexec: true
+filesystem_tmp_size: "2G"
+filesystem_var_tmp_noexec: true
+filesystem_var_tmp_size: "1G"
+filesystem_dev_shm_enabled: true
+filesystem_dev_shm_size: "1G"
+filesystem_world_writable_exclude:
+  - /proc
+  - /sys
+  - /dev
+  - /run

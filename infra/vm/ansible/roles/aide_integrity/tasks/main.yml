@@ -1,0 +1,74 @@
+---
+# Lapis 7: integritas file (AIDE).
+# Catatan: init AIDE bisa 5-15 menit pada disk besar.
+
+- name: Install AIDE
+  ansible.builtin.apt:
+    name:
+      - aide
+      - aide-common
+    state: present
+  when: aide_enabled | bool
+
+- name: Template pengecualian AIDE
+  ansible.builtin.template:
+    src: 99-gatezero.conf.j2
+    dest: /etc/aide/aide.conf.d/99-gatezero.conf
+    owner: root
+    group: root
+    mode: "0640"
+  when: aide_enabled | bool
+
+- name: Cek database AIDE
+  ansible.builtin.stat:
+    path: /var/lib/aide/aide.db
+  register: aide_db
+  when: aide_enabled | bool
+
+- name: Inisialisasi database AIDE (sekali)
+  ansible.builtin.command: aideinit
+  args:
+    creates: /var/lib/aide/aide.db.new
+  when:
+    - aide_enabled | bool
+    - not aide_db.stat.exists
+  async: "{{ aide_init_timeout }}"
+  poll: 30
+
+- name: Cek hasil inisialisasi
+  ansible.builtin.stat:
+    path: /var/lib/aide/aide.db.new
+  register: aide_db_new
+  when: aide_enabled | bool
+
+- name: Pasang database hasil init
+  ansible.builtin.command: mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+  when:
+    - aide_enabled | bool
+    - aide_db_new.stat.exists | default(false)
+
+- name: Buat direktori log AIDE
+  ansible.builtin.file:
+    path: /var/log/aide
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: aide_enabled | bool
+
+- name: Template pemeriksaan harian
+  ansible.builtin.template:
+    src: aide-check.j2
+    dest: /etc/cron.daily/aide-check
+    owner: root
+    group: root
+    mode: "0700"
+  when: aide_enabled | bool
+
+- name: Verifikasi database AIDE ada
+  ansible.builtin.assert:
+    that:
+      - aide_db.stat.exists or aide_db_new.stat.exists | default(false)
+    fail_msg: "Database AIDE tidak terbentuk. Cek /var/log/aide/aideinit.log"
+    success_msg: "AIDE siap"
+  when: aide_enabled | bool

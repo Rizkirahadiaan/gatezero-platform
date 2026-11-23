@@ -1,0 +1,9 @@
+---
+# Verifikasi read-only node Kubernetes. TIDAK mengubah apa pun.
+#
+# Yang diperiksa di sini adalah konfigurasi yang bersumber dari
+# platform/bootstrap/ansible. Kalau gagal, perbaiki di sana lalu jalankan
+# ulang bootstrap — jangan menambal node secara manual.
+
+kubeconfig_path: /etc/kubernetes/admin.conf
+k8s_expected_etcd_mount: /var/lib/etcd

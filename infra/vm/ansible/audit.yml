@@ -1,0 +1,7 @@
+---
+- name: "CIS audit (read-only)"
+  hosts: vms
+  become: true
+  gather_facts: true
+  roles:
+    - cis_audit

@@ -1,0 +1,12 @@
+---
+# Default role. group_vars/all menimpanya.
+os_timezone: UTC
+ntp_servers:
+  - 0.pool.ntp.org
+journald_system_max_use: "2G"
+journald_system_max_file_size: "200M"
+journald_max_retention: "30day"
+journald_forward_to_syslog: true
+patch_security_only: true
+patch_auto_reboot: false
+patch_remove_unused: false

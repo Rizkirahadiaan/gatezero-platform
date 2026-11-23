@@ -1,0 +1,10 @@
+---
+firewall_enabled: true
+firewall_admin_cidrs: []
+firewall_cluster_cidrs: []
+firewall_allowed_tcp: []
+firewall_allowed_from_world_tcp: []
+firewall_allowed_udp: []
+firewall_extra_allowed_tcp: []
+firewall_log_dropped: true
+firewall_ssh_port: "{{ ssh_port | default(22) }}"

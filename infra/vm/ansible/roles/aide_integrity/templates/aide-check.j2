@@ -1,0 +1,14 @@
+#!/bin/sh
+# Dikelola Ansible (role aide_integrity).
+set -eu
+
+DATE=$(date +%F)
+OUT="/var/log/aide/check-${DATE}.log"
+
+/usr/bin/aide --check --config /etc/aide/aide.conf > "$OUT" 2>&1 || true
+
+# ringkasan ke syslog -> diteruskan ke log pusat
+grep -E '^(added|removed|changed)' "$OUT" | head -50 | logger -t aide -p auth.warning || true
+
+# retensi 30 hari
+find /var/log/aide -name 'check-*.log' -mtime +30 -delete

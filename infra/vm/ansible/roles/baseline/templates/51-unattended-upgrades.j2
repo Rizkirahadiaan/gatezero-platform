@@ -1,0 +1,21 @@
+// Dikelola Ansible (role baseline). Jangan edit manual.
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+
+{% if patch_security_only | bool %}
+Unattended-Upgrade::Origins-Pattern {
+  "origin=Ubuntu,archive=*-security";
+};
+{% else %}
+Unattended-Upgrade::Origins-Pattern {
+  "origin=Ubuntu,archive=*-security";
+  "origin=Ubuntu,archive=*-updates";
+};
+{% endif %}
+
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if patch_auto_reboot | bool else 'false' }}";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "{{ 'true' if patch_remove_unused | bool else 'false' }}";
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::SyslogEnable "true";

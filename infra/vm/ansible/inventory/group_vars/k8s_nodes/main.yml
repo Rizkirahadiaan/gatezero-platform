@@ -1,0 +1,37 @@
+---
+# Overlay untuk node Kubernetes. Menimpa nilai baseline.
+
+kernel_kptr_restrict: 2
+# Worker observability boleh diturunkan ke 1 (butuh perf/bcc) lewat host_vars.
+
+# Cilium: rp_filter strict bisa memblokir trafik VXLAN. Longgar (2) lebih aman.
+kernel_rp_filter: 2
+
+# --- sysctl khusus node --------------------------------------------------
+k8s_inotify_max_user_watches: 1048576
+k8s_inotify_max_user_instances: 8192
+k8s_kernel_keys_maxkeys: 20000
+k8s_somaxconn: 32768
+k8s_vm_swappiness: 0
+
+# --- firewall: port dari INSTALL.md §3 -----------------------------------
+firewall_allowed_tcp:
+  - 6443      # kube-apiserver (VIP diarahkan ke sini)
+  - 2379      # etcd client
+  - 2380      # etcd peer
+  - 2381      # etcd metrics
+  - 10250     # kubelet API
+  - 10257     # controller-manager
+  - 10259     # scheduler
+  - 4240      # Cilium health
+  - 9100      # node-exporter
+firewall_allowed_udp:
+  - 8472      # VXLAN (Cilium)
+
+# JANGAN set ke false di node k8s tanpa alasan kuat:
+# NetworkPolicy Cilium menangani trafik pod, nftables menangani management plane.
+firewall_enabled: true
+
+# --- verifikasi ----------------------------------------------------------
+k8s_expected_etcd_mount: /var/lib/etcd
+k8s_require_separate_etcd_disk: true

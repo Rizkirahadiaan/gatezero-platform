@@ -1,0 +1,58 @@
+---
+# Overlay sysctl node Kubernetes (HARDENING-K8S.md bagian 2).
+#
+# PENTING: jangan menyentuh tiga sysctl yang divalidasi kubelet saat
+# protectKernelDefaults=true. Role ini hanya MENAMBAH, tidak mengubahnya.
+
+- name: Pastikan modul kernel untuk Kubernetes tersedia
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Template sysctl node Kubernetes
+  ansible.builtin.template:
+    src: 91-k8s-node.conf.j2
+    dest: /etc/sysctl.d/91-k8s-node.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload sysctl
+
+- name: Terapkan sysctl sekarang
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+
+# --- verifikasi ----------------------------------------------------------
+
+- name: Baca sysctl yang kritis
+  ansible.builtin.command: >-
+    sysctl -n
+    net.ipv4.ip_forward
+    net.bridge.bridge-nf-call-iptables
+    fs.inotify.max_user_watches
+    vm.swappiness
+  register: k8s_sysctl_check
+  changed_when: false
+
+- name: Pastikan sysctl k8s benar
+  ansible.builtin.assert:
+    that:
+      - k8s_sysctl_check.stdout_lines[0] | trim == '1'
+      - k8s_sysctl_check.stdout_lines[1] | trim == '1'
+      - k8s_sysctl_check.stdout_lines[2] | trim | int >= 524288
+      - k8s_sysctl_check.stdout_lines[3] | trim | int == 0
+    fail_msg: >-
+      sysctl node tidak sesuai: {{ k8s_sysctl_check.stdout_lines }}.
+      ip_forward dan bridge-nf-call-iptables WAJIB 1 karena kubelet memakainya
+      saat protectKernelDefaults=true.
+    success_msg: "sysctl node Kubernetes sesuai"
+
+- name: Peringatan penurunan kptr_restrict untuk profiling
+  ansible.builtin.debug:
+    msg: >-
+      kernel.kptr_restrict={{ kernel_kptr_restrict | default(2) }}.
+      Jika node ini menjalankan perf/bcc, turunkan ke 1 lewat host_vars.
+  when: kernel_kptr_restrict | default(2) | int >= 2

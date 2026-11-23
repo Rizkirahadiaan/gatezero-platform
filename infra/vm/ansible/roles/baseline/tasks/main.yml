@@ -1,0 +1,147 @@
+---
+# Lapis 0-2, 6 dari HARDENING.md: paket, waktu, umask, journald, patch policy.
+
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install paket dasar
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - jq
+      - chrony
+      - tzdata
+      - nftables
+      - unattended-upgrades
+      - apt-listchanges
+    state: present
+
+# --- waktu ---------------------------------------------------------------
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ os_timezone }}"
+
+- name: Template konfigurasi chrony
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart chrony
+
+- name: Aktifkan chrony
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: true
+
+# --- umask & kebijakan akun lokal ----------------------------------------
+
+- name: Template umask shell-wide
+  ansible.builtin.template:
+    src: 99-umask.sh.j2
+    dest: /etc/profile.d/99-umask.sh
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Set UMASK di login.defs
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^UMASK\s'
+    line: "UMASK           {{ umask_value | default('027') }}"
+    state: present
+
+- name: Set kebijakan umur password (akun lokal darurat)
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: "^PASS_{{ item.key }}\\s"
+    line: "PASS_{{ item.key }}   {{ item.value }}"
+  loop:
+    - { key: MAX_DAYS, value: "90" }
+    - { key: MIN_DAYS, value: "1" }
+    - { key: WARN_AGE, value: "7" }
+
+# --- journald ------------------------------------------------------------
+
+- name: Buat direktori drop-in journald
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Template batas journald
+  ansible.builtin.template:
+    src: journald.conf.j2
+    dest: /etc/systemd/journald.conf.d/99-cap.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart systemd-journald
+
+# --- patch policy --------------------------------------------------------
+
+- name: Template unattended-upgrades
+  ansible.builtin.template:
+    src: 51-unattended-upgrades.j2
+    dest: /etc/apt/apt.conf.d/51-unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Aktifkan unattended-upgrades
+  ansible.builtin.service:
+    name: unattended-upgrades
+    state: started
+    enabled: true
+
+- name: Pastikan apt tidak meminta konfirmasi interaktif
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/90-noninteractive
+    content: |
+      APT::Get::Assume-Yes "true";
+      APT::Get::force-yes "false";
+      Dpkg::Options { "--force-confdef"; "--force-confold"; };
+      Dpkg::Use-Pty "0";
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- verifikasi ----------------------------------------------------------
+
+- name: Cek sinkronisasi waktu
+  ansible.builtin.command: chronyc tracking
+  register: chrony_tracking
+  changed_when: false
+  # VM baru butuh 30-60 detik untuk mencapai "Normal"
+  retries: 12
+  delay: 5
+  until: chrony_tracking.stdout is search('Leap status\s+:\s+Normal')
+  failed_when: chrony_tracking.stdout is not search('Leap status\s+:\s+Normal')
+
+- name: Cek identitas mesin (tidak boleh kosong)
+  ansible.builtin.stat:
+    path: /etc/machine-id
+  register: machine_id
+
+- name: Peringatkan machine-id kosong
+  ansible.builtin.debug:
+    msg: >-
+      /etc/machine-id kosong di {{ inventory_hostname }}.
+      Node hasil clone tanpa regenerate akan bentrok. Regenerate sebelum init cluster.
+  when: machine_id.stat.size | default(0) == 0
+
+- name: Ringkasan baseline
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: timezone {{ os_timezone }},
+      chrony OK, journald cap {{ journald_system_max_use }},
+      auto-reboot {{ patch_auto_reboot }}

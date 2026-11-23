@@ -1,0 +1,6 @@
+# Dikelola Ansible (role aide_integrity).
+# Path yang memang berubah terus tidak boleh masuk baseline, kalau tidak
+# hasil check penuh noise dan akhirnya diabaikan.
+{% for p in aide_exclude_paths %}
+!{{ p }}
+{% endfor %}

@@ -1,0 +1,138 @@
+---
+# CIS audit — READ-ONLY. Tidak mengubah konfigurasi apa pun.
+# Penjelasan lengkap: infra/vm/CIS-BENCHMARK.md
+
+- name: Buat direktori hasil di controller
+  ansible.builtin.file:
+    path: "{{ cis_results_dir }}/{{ ansible_date_time.date }}/{{ inventory_hostname }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+
+# --- Lynis ---------------------------------------------------------------
+
+- name: Install Lynis
+  ansible.builtin.apt:
+    name: lynis
+    state: present
+  when: cis_lynis_enabled | bool
+
+- name: Jalankan Lynis
+  ansible.builtin.command: lynis audit system --quick --quiet
+  register: lynis_run
+  changed_when: false
+  failed_when: lynis_run.rc not in [0, 1]
+  when: cis_lynis_enabled | bool
+
+- name: Ambil hardening index
+  ansible.builtin.shell: |
+    set -eu
+    grep -m1 '^hardening_index' /var/log/lynis-report.dat | cut -d= -f2
+  args:
+    executable: /bin/bash
+  register: lynis_score
+  changed_when: false
+  when: cis_lynis_enabled | bool
+
+- name: Ambil saran Lynis yang belum diterapkan
+  ansible.builtin.shell: |
+    set -eu
+    grep '^suggestion\[\]' /var/log/lynis-report.dat | head -20
+  args:
+    executable: /bin/bash
+  register: lynis_suggestions
+  changed_when: false
+  failed_when: false
+  when: cis_lynis_enabled | bool
+
+- name: Ambil laporan Lynis
+  ansible.builtin.fetch:
+    src: /var/log/lynis-report.dat
+    dest: >-
+      {{ cis_results_dir }}/{{ ansible_date_time.date }}/{{ inventory_hostname }}/lynis-report.dat
+    flat: true
+  when: cis_lynis_enabled | bool
+
+- name: Laporkan skor Lynis
+  ansible.builtin.debug:
+    msg:
+      - "{{ inventory_hostname }}: hardening_index = {{ lynis_score.stdout | default('n/a') | trim }}"
+      - "target: {{ cis_lynis_target_score }}"
+      - "{{ 'DI BAWAH TARGET' if (lynis_score.stdout | default('0') | trim | int) < (cis_lynis_target_score | int) else 'memenuhi target' }}"
+  when: cis_lynis_enabled | bool
+
+- name: Gagal kalau skor di bawah ambang minimum
+  ansible.builtin.assert:
+    that:
+      - lynis_score.stdout | trim | int >= cis_lynis_min_score | int
+    fail_msg: >-
+      Skor Lynis {{ lynis_score.stdout | trim }}, ambang {{ cis_lynis_min_score }}.
+    success_msg: "Skor Lynis memenuhi ambang minimum"
+  when:
+    - cis_lynis_enabled | bool
+    - cis_lynis_min_score | int > 0
+
+# --- USG (opsional) ------------------------------------------------------
+# ⚠️ Hanya AUDIT. `usg fix` tidak pernah dijalankan dari role ini.
+
+- name: Audit dengan USG
+  when: cis_usg_enabled | bool
+  block:
+    - name: Install Ubuntu Security Guide
+      ansible.builtin.apt:
+        name: usg
+        state: present
+
+    - name: Jalankan USG audit
+      ansible.builtin.command: usg audit {{ cis_usg_profile }}
+      register: usg_run
+      changed_when: false
+      failed_when: false
+
+    - name: Cari laporan USG
+      ansible.builtin.find:
+        paths: /var/lib/usg
+        patterns: "*.html,*.xml"
+      register: usg_reports
+
+    - name: Ambil laporan USG
+      ansible.builtin.fetch:
+        src: "{{ item.path }}"
+        dest: >-
+          {{ cis_results_dir }}/{{ ansible_date_time.date }}/{{ inventory_hostname }}/{{ item.path | basename }}
+        flat: true
+      loop: "{{ usg_reports.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+    - name: Laporkan hasil USG
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: {{ usg_reports.files | length }} laporan USG
+          ({{ cis_usg_profile }}). JANGAN jalankan `usg fix` di node hidup.
+
+# --- metrik --------------------------------------------------------------
+
+- name: Kirim skor ke Pushgateway
+  ansible.builtin.uri:
+    url: "{{ cis_pushgateway_url }}/metrics/job/cis_audit/instance/{{ inventory_hostname }}"
+    method: PUT
+    body_format: raw
+    body: |
+      # TYPE compliance_score gauge
+      compliance_score{source="lynis",host="{{ inventory_hostname }}"} {{ lynis_score.stdout | trim }}
+    status_code: [200, 202]
+  when:
+    - cis_pushgateway_url | length > 0
+    - cis_lynis_enabled | bool
+    - lynis_score.stdout is defined
+
+# --- ringkasan -----------------------------------------------------------
+
+- name: Ringkasan audit
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: lynis={{ lynis_score.stdout | default('n/a') | trim }}
+      ({{ lynis_suggestions.stdout_lines | default([]) | length }} saran).
+      Hasil di {{ cis_results_dir }}/{{ ansible_date_time.date }}/{{ inventory_hostname }}/

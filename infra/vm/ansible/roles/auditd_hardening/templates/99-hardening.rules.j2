@@ -1,0 +1,33 @@
+# Dikelola Ansible (role auditd_hardening).
+#
+# -f {{ auditd_failure_mode }} = jangan panic saat disk penuh.
+# Aturan execve sengaja difilter euid=0 untuk membatasi overhead pada
+# node yang banyak forking (runner/build).
+
+-D
+-b {{ auditd_backlog_limit }}
+--backlog_wait_time 0
+-f {{ auditd_failure_mode }}
+
+# --- identitas ---
+-w /etc/passwd -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/group -p wa -k identity
+-w /etc/gshadow -p wa -k identity
+-w /etc/sudoers -p wa -k privilege
+-w /etc/sudoers.d/ -p wa -k privilege
+
+# --- autentikasi ---
+-w /etc/ssh/sshd_config -p wa -k sshd
+-w /etc/ssh/sshd_config.d/ -p wa -k sshd
+-w /var/log/auth.log -p wa -k authlog
+
+# --- paket & service ---
+-w /etc/apt/ -p wa -k package
+-w /etc/systemd/ -p wa -k systemd
+
+# --- eksekusi root dari sesi user ---
+-a always,exit -F arch=b64 -S execve -F euid=0 -F auid>=1000 -F auid!=-1 -k root_exec
+
+# --- modul kernel ---
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k modules

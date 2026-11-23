@@ -1,0 +1,66 @@
+---
+# Lapis 6: auditd.
+
+- name: Install auditd
+  ansible.builtin.apt:
+    name:
+      - auditd
+      - audispd-plugins
+    state: present
+
+- name: Template aturan audit
+  ansible.builtin.template:
+    src: 99-hardening.rules.j2
+    dest: /etc/audit/rules.d/99-hardening.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart auditd
+
+- name: Set batas file log audit
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^{{ item.key }} ="
+    line: "{{ item.key }} = {{ item.value }}"
+  loop:
+    - { key: max_log_file,            value: "{{ auditd_max_log_file }}" }
+    - { key: num_logs,                value: "{{ auditd_num_logs }}" }
+    - { key: max_log_file_action,     value: ROTATE }
+    - { key: space_left_action,       value: SYSLOG }
+    - { key: admin_space_left_action, value: SUSPEND }
+    - { key: disk_full_action,        value: SUSPEND }
+    - { key: disk_error_action,       value: SUSPEND }
+  notify: restart auditd
+
+- name: Aktifkan auditd
+  ansible.builtin.service:
+    name: auditd
+    state: started
+    enabled: true
+
+- name: Muat aturan audit sekarang
+  ansible.builtin.command: augenrules --load
+  changed_when: false
+  failed_when: false
+
+# --- verifikasi ----------------------------------------------------------
+
+- name: Baca status audit
+  ansible.builtin.command: auditctl -s
+  register: audit_status
+  changed_when: false
+
+- name: Hitung aturan aktif
+  ansible.builtin.command: auditctl -l
+  register: audit_rules
+  changed_when: false
+
+- name: Pastikan auditd aktif dan punya aturan
+  ansible.builtin.assert:
+    that:
+      - audit_status.stdout is search('enabled 1') or audit_status.stdout is search('enabled=1')
+      - audit_rules.stdout_lines | length > 5
+    fail_msg: >-
+      auditd tidak aktif atau aturan kosong.
+      Status: {{ audit_status.stdout }}
+    success_msg: "auditd aktif dengan {{ audit_rules.stdout_lines | length }} aturan"

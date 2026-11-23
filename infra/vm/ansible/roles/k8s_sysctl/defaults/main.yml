@@ -1,0 +1,6 @@
+---
+k8s_inotify_max_user_watches: 1048576
+k8s_inotify_max_user_instances: 8192
+k8s_kernel_keys_maxkeys: 20000
+k8s_somaxconn: 32768
+k8s_vm_swappiness: 0

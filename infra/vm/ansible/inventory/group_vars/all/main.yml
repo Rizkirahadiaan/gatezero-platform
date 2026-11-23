@@ -1,0 +1,115 @@
+---
+# ============================================================================
+# Variabel baseline hardening. Berlaku untuk SEMUA VM.
+# Ubah di sini, jangan di role.
+# ============================================================================
+
+# --- waktu ---------------------------------------------------------------
+os_timezone: Asia/Jakarta
+ntp_servers:
+  - ntp1.gatezero.lab
+  - ntp2.gatezero.lab
+
+# --- identitas akses -----------------------------------------------------
+ssh_port: 22
+ssh_permit_root_login: "no"
+ssh_password_authentication: "no"
+ssh_max_auth_tries: 3
+ssh_allow_tcp_forwarding: "no"
+ssh_client_alive_interval: 300
+ssh_client_alive_count_max: 2
+ssh_login_grace_time: 20
+# kosong = tidak membatasi user
+ssh_allow_users: []
+
+# --- jaringan ------------------------------------------------------------
+# WAJIB diisi. Role akan menolak jalan kalau kosong atau 0.0.0.0/0.
+#
+# ⚠️ admin_cidrs harus mencakup sumber Ansible kamu. Kalau kamu menjalankan
+# playbook dari jaringan lain, SSH baru akan diblokir setelah ruleset aktif
+# (sesi yang sedang berjalan tetap aman karena `ct state established`).
+firewall_admin_cidrs:
+  - 10.10.20.0/24
+firewall_cluster_cidrs:
+  - 10.10.20.0/24
+
+# Bisa dimatikan per host lewat host_vars: firewall_enabled: false
+firewall_enabled: true
+firewall_log_dropped: true
+# port tambahan dari jaringan cluster (mis. exporter)
+firewall_extra_allowed_tcp: []
+
+# --- kernel --------------------------------------------------------------
+kernel_kptr_restrict: 2
+kernel_dmesg_restrict: 1
+kernel_yama_ptrace_scope: 1
+kernel_perf_event_paranoid: 3
+kernel_rp_filter: 1
+# JANGAN set false tanpa sadar: disable_ipv6=1 memutus listener dual-stack
+# (nginx `listen [::]:80`, Java, dsb). Cukup accept_ra=0 di bawah.
+kernel_enable_ipv6: true
+
+# --- umask ---------------------------------------------------------------
+umask_value: "027"
+
+# --- filesystem ----------------------------------------------------------
+# noexec di /tmp mematikan build tool yang jalan di HOST.
+# Runner dengan kubernetes executor tidak terpengaruh (build di dalam pod).
+filesystem_tmp_noexec: true
+filesystem_tmp_size: "2G"
+filesystem_var_tmp_noexec: true
+filesystem_dev_shm_enabled: true
+filesystem_dev_shm_size: "1G"
+# path yang dikecualikan dari pemeriksaan world-writable
+filesystem_world_writable_exclude:
+  - /proc
+  - /sys
+  - /dev
+  - /var/lib
+  - /run
+
+# --- layanan -------------------------------------------------------------
+service_minimize_disable:
+  - cups
+  - cups-browsed
+  - avahi-daemon
+  - rpcbind
+  - bluetooth
+  - ModemManager
+  - whoopsie
+  - apport
+
+# Kosong secara default: penghapusan paket bersifat destruktif dan harus
+# diputuskan per VM. Isi di host_vars bila yakin, mis:
+#   service_minimize_remove: [snapd, telnet, rsh-client]
+service_minimize_remove: []
+
+# --- logging -------------------------------------------------------------
+journald_system_max_use: "2G"
+journald_system_max_file_size: "200M"
+journald_max_retention: "30day"
+journald_forward_to_syslog: true
+
+# --- patch ---------------------------------------------------------------
+patch_security_only: true
+patch_auto_reboot: false
+patch_remove_unused: false
+
+# --- auditd --------------------------------------------------------------
+auditd_backlog_limit: 8192
+auditd_max_log_file: 50
+auditd_num_logs: 10
+# false = jangan panic saat disk penuh (nilai 1)
+auditd_failure_mode: 1
+
+# --- integritas ----------------------------------------------------------
+aide_enabled: true
+# AIDE init bisa 5-15 menit pada disk besar
+aide_init_timeout: 1800
+
+# --- CIS audit -----------------------------------------------------------
+cis_lynis_enabled: true
+cis_usg_enabled: false
+# kosong = tidak push
+cis_pushgateway_url: ""
+cis_results_dir: "{{ playbook_dir }}/../../../benchmarks/cis"

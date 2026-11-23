@@ -1,0 +1,54 @@
+---
+# Lapis 3: kernel sysctl + blacklist module.
+
+kernel_kptr_restrict: 2
+kernel_dmesg_restrict: 1
+kernel_yama_ptrace_scope: 1
+kernel_perf_event_paranoid: 3
+kernel_rp_filter: 1
+kernel_enable_ipv6: true
+
+kernel_sysctl:
+  kernel.kptr_restrict: "{{ kernel_kptr_restrict }}"
+  kernel.dmesg_restrict: "{{ kernel_dmesg_restrict }}"
+  kernel.yama.ptrace_scope: "{{ kernel_yama_ptrace_scope }}"
+  kernel.randomize_va_space: "2"
+  kernel.sysrq: "0"
+  kernel.core_pattern: "|/bin/false"
+  kernel.unprivileged_bpf_disabled: "1"
+  kernel.bpf_jit_harden: "2"
+  kernel.perf_event_paranoid: "{{ kernel_perf_event_paranoid }}"
+
+  fs.protected_hardlinks: "1"
+  fs.protected_symlinks: "1"
+  fs.protected_fifos: "2"
+  fs.protected_regular: "2"
+  fs.suid_dumpable: "0"
+
+  net.ipv4.conf.all.accept_redirects: "0"
+  net.ipv4.conf.default.accept_redirects: "0"
+  net.ipv4.conf.all.secure_redirects: "0"
+  net.ipv4.conf.all.send_redirects: "0"
+  net.ipv4.conf.default.send_redirects: "0"
+  net.ipv4.conf.all.accept_source_route: "0"
+  net.ipv4.conf.default.accept_source_route: "0"
+  net.ipv4.conf.all.log_martians: "1"
+  net.ipv4.icmp_echo_ignore_broadcasts: "1"
+  net.ipv4.icmp_ignore_bogus_error_responses: "1"
+  net.ipv4.tcp_syncookies: "1"
+  net.ipv4.conf.all.rp_filter: "{{ kernel_rp_filter }}"
+  net.ipv4.conf.default.rp_filter: "{{ kernel_rp_filter }}"
+  net.ipv6.conf.all.accept_ra: "0"
+  net.ipv6.conf.all.accept_redirects: "0"
+
+kernel_modules_blacklist:
+  - cramfs
+  - freevxfs
+  - hfs
+  - hfsplus
+  - jffs2
+  - udf
+  - dccp
+  - rds
+  - tipc
+  - usb-storage

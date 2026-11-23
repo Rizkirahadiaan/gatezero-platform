@@ -1,0 +1,7 @@
+# Dikelola Ansible (role kernel_hardening).
+#
+# JANGAN blacklist: overlay, br_netfilter, nf_conntrack, vxlan, geneve,
+# iscsi_tcp, nvme, virtio_*. Kubernetes/Cilium/CSI membutuhkannya.
+{% for mod in kernel_modules_blacklist %}
+install {{ mod }} /bin/true
+{% endfor %}

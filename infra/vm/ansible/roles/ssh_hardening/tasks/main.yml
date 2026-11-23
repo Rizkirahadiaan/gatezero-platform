@@ -1,0 +1,87 @@
+---
+# Lapis 1: SSH.
+
+- name: Pastikan openssh-server terpasang
+  ansible.builtin.apt:
+    name: openssh-server
+    state: present
+
+# --- pengaman sebelum mengubah apa pun -----------------------------------
+# Kalau user akses tidak punya key, mematikan password auth = terkunci di luar.
+
+- name: Cari home user akses
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ ansible_user }}"
+
+- name: Pastikan user akses punya authorized_keys
+  ansible.builtin.stat:
+    path: "{{ getent_passwd[ansible_user][4] }}/.ssh/authorized_keys"
+  register: ssh_authkeys
+
+- name: Batalkan kalau tidak ada SSH key (mencegah lockout)
+  ansible.builtin.fail:
+    msg: >-
+      {{ ansible_user }} tidak punya {{ getent_passwd[ansible_user][4] }}/.ssh/authorized_keys.
+      Mematikan password auth akan mengunci akses. Pasang SSH key dulu.
+  when:
+    - ssh_password_authentication | string == 'no'
+    - not ssh_authkeys.stat.exists
+
+# --- konfigurasi ---------------------------------------------------------
+
+- name: Pastikan sshd_config memuat direktori drop-in
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "Include /etc/ssh/sshd_config.d/*.conf"
+    insertbefore: BOF
+    state: present
+  notify: restart ssh
+
+- name: Template drop-in hardening SSH
+  ansible.builtin.template:
+    src: 99-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-hardening.conf
+    owner: root
+    group: root
+    mode: "0600"
+  notify: restart ssh
+
+- name: Template banner
+  ansible.builtin.template:
+    src: issue.net.j2
+    dest: /etc/issue.net
+    owner: root
+    group: root
+    mode: "0644"
+  when: ssh_banner_enabled | bool
+
+# --- validasi SEBELUM restart -------------------------------------------
+# Kalau task ini gagal, play berhenti dan sshd lama tetap jalan.
+
+- name: Validasi sintaks sshd
+  ansible.builtin.command: sshd -t
+  register: sshd_test
+  changed_when: false
+  failed_when: sshd_test.rc != 0
+
+- name: Validasi nilai efektif
+  ansible.builtin.shell: |
+    set -eu
+    sshd -T | grep -E '^(permitrootlogin|passwordauthentication|maxauthtries|maxsessions|allowtcpforwarding) '
+  args:
+    executable: /bin/bash
+  register: sshd_effective
+  changed_when: false
+
+- name: Tampilkan nilai efektif
+  ansible.builtin.debug:
+    msg: "{{ sshd_effective.stdout_lines }}"
+
+- name: Gagal kalau password auth atau root login masih aktif
+  ansible.builtin.assert:
+    that:
+      - "'passwordauthentication no' in sshd_effective.stdout"
+      - "'permitrootlogin no' in sshd_effective.stdout"
+    fail_msg: "Konfigurasi SSH tidak sesuai. Periksa /etc/ssh/sshd_config.d/"
+    success_msg: "SSH sesuai baseline"

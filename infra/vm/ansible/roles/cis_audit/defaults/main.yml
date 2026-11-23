@@ -1,0 +1,8 @@
+---
+cis_lynis_enabled: true
+cis_usg_enabled: false
+cis_usg_profile: cis_level1_server
+cis_pushgateway_url: ""
+cis_results_dir: "{{ playbook_dir }}/../../../benchmarks/cis"
+cis_lynis_min_score: 0
+cis_lynis_target_score: 80

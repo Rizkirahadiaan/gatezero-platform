@@ -1,0 +1,15 @@
+---
+- name: "Baseline hardening (semua VM)"
+  hosts: vms
+  become: true
+  gather_facts: true
+  roles:
+    # urutan penting: SSH sebelum firewall, AIDE terakhir (snapshot kondisi final)
+    - baseline
+    - ssh_hardening
+    - kernel_hardening
+    - filesystem_hardening
+    - service_minimize
+    - auditd_hardening
+    - nftables_firewall
+    - aide_integrity

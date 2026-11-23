@@ -1,0 +1,8 @@
+[Journal]
+SystemMaxUse={{ journald_system_max_use }}
+SystemMaxFileSize={{ journald_system_max_file_size }}
+RuntimeMaxUse=200M
+MaxRetentionSec={{ journald_max_retention }}
+Compress=yes
+Storage=persistent
+ForwardToSyslog={{ 'yes' if journald_forward_to_syslog | bool else 'no' }}

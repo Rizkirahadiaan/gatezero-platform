@@ -1,0 +1,15 @@
+# Dikelola Ansible (role k8s_sysctl).
+#
+# Tiga sysctl berikut divalidasi kubelet saat protectKernelDefaults=true.
+# JANGAN diubah ke nilai lain:
+#   net.ipv4.ip_forward                 = 1
+#   net.bridge.bridge-nf-call-iptables  = 1
+#   kernel.keys.maxkeys                 >= 200
+
+kernel.keys.maxkeys = {{ k8s_kernel_keys_maxkeys }}
+
+fs.inotify.max_user_watches   = {{ k8s_inotify_max_user_watches }}
+fs.inotify.max_user_instances = {{ k8s_inotify_max_user_instances }}
+
+net.core.somaxconn = {{ k8s_somaxconn }}
+vm.swappiness      = {{ k8s_vm_swappiness }}
