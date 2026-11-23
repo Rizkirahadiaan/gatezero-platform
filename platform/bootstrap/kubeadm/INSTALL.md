@@ -86,17 +86,148 @@ Yang akan terbentuk:
 | `K8S_VER` | `1.34` | pin N-1 dari rilis terbaru |
 | `NEXUS` | `nexus.gatezero.lab` | artifact hub |
 
-| Host | IP | vCPU | RAM | Disk |
-|---|---|---|---|---|
-| `k8s-cp-01` | `10.10.20.11` | 4 | 8 GB | 60 GB + 40 GB etcd |
-| `k8s-cp-02` | `10.10.20.12` | 4 | 8 GB | 60 GB + 40 GB etcd |
-| `k8s-cp-03` | `10.10.20.13` | 4 | 8 GB | 60 GB + 40 GB etcd |
-| `k8s-w-01` | `10.10.20.21` | 8 | 16 GB | 200 GB |
-| `k8s-w-02` | `10.10.20.22` | 8 | 16 GB | 200 GB |
-| `k8s-w-03` | `10.10.20.23` | 8 | 16 GB | 200 GB |
-| VIP | `10.10.20.10` | — | — | — |
+| Host | IP | vCPU | RAM | vDisk 1 (OS) | vDisk 2 (data) |
+|---|---|---|---|---|---|
+| `k8s-cp-01` | `10.10.20.11` | 4 | 8 GB | 60 GB | 40 GB `etcd` |
+| `k8s-cp-02` | `10.10.20.12` | 4 | 8 GB | 60 GB | 40 GB `etcd` |
+| `k8s-cp-03` | `10.10.20.13` | 4 | 8 GB | 60 GB | 40 GB `etcd` |
+| `k8s-w-01` | `10.10.20.21` | 8 | 16 GB | 200 GB | — |
+| `k8s-w-02` | `10.10.20.22` | 8 | 16 GB | 200 GB | — |
+| `k8s-w-03` | `10.10.20.23` | 8 | 16 GB | 200 GB | — |
+| VIP | `10.10.20.10` | — | — | — | — |
 
 **OS:** Ubuntu 24.04 LTS, minimal install, tanpa desktop.
+
+### Layout partisi
+
+Aturan yang mengatur layout ini:
+
+1. **etcd selalu di vDisk terpisah** — image pull tidak boleh memblokir `fsync` etcd.
+2. **`/var/lib/containerd` selalu filesystem sendiri** — supaya kubelet bisa membedakan
+   `nodefs` dan `imagefs`, dan eviction bekerja independen.
+3. **Data disk pakai `LABEL=`, bukan `/dev/sdX`** — urutan device Nutanix bisa berubah.
+4. **Tidak ada swap** dan **tidak ada `nofail`** untuk etcd/containerd.
+
+#### Control plane — vDisk 1 (60 GB, `/dev/sda`)
+
+```
+/dev/sda  60 GB
+├── sda1    1 GB    EFI System (ef00)        /boot/efi              vfat
+├── sda2    2 GB    Linux filesystem (8300)  /boot                  ext4
+└── sda3   ~57 GB   Linux LVM (8e00)  ──►    VG vg0
+     ├── lv_root        18 GB   /                     xfs
+     ├── lv_containerd  18 GB   /var/lib/containerd   xfs
+     ├── lv_var         12 GB   /var                  xfs
+     ├── lv_log          5 GB   /var/log              xfs
+     └── lv_home         2 GB   /home                 xfs
+         sisa VG ~2 GB  (cadangan untuk pertumbuhan)
+```
+
+#### Control plane — vDisk 2 (40 GB, `/dev/sdb`)
+
+```
+/dev/sdb  40 GB
+└── sdb1   40 GB    Linux filesystem (8300)   /var/lib/etcd   ext4  LABEL=etcd
+```
+
+#### Worker — vDisk 1 (200 GB, `/dev/sda`)
+
+```
+/dev/sda  200 GB
+├── sda1    1 GB    EFI System (ef00)        /boot/efi              vfat
+├── sda2    2 GB    Linux filesystem (8300)  /boot                  ext4
+└── sda3  ~197 GB   Linux LVM (8e00)  ──►    VG vg0
+     ├── lv_root         18 GB   /                     xfs
+     ├── lv_containerd  120 GB   /var/lib/containerd   xfs
+     ├── lv_var          40 GB   /var                  xfs
+     ├── lv_log          15 GB   /var/log              xfs
+     └── lv_home          2 GB   /home                 xfs
+         sisa VG ~2 GB
+```
+
+> Worker hanya punya satu vDisk, tapi tetap mendapat `nodefs`/`imagefs` terpisah
+> karena `/var/lib/containerd` adalah **LV sendiri** — bukan karena disk berbeda.
+> Yang penting adalah filesystem-nya berbeda, bukan device-nya.
+
+#### `/etc/fstab`
+
+```fstab
+# --- control plane ---
+UUID=<esp>        /boot/efi            vfat   umask=0077                        0 1
+UUID=<boot>       /boot                ext4   defaults                          0 2
+/dev/vg0/lv_root        /                     xfs    defaults                    0 0
+/dev/vg0/lv_var         /var                  xfs    defaults,noatime            0 0
+/dev/vg0/lv_containerd  /var/lib/containerd   xfs    defaults,noatime,nodev,nosuid 0 0
+/dev/vg0/lv_log         /var/log             xfs    defaults,nodev,nosuid,noatime 0 0
+/dev/vg0/lv_home        /home                xfs    defaults,nodev,nosuid,noatime 0 0
+
+# etcd: TANPA nofail. Disk hilang = node HARUS gagal boot.
+LABEL=etcd        /var/lib/etcd        ext4   defaults,noatime,nodev,nosuid     0 2
+```
+
+```fstab
+# --- worker ---
+/dev/vg0/lv_root        /                     xfs    defaults                    0 0
+/dev/vg0/lv_var         /var                  xfs    defaults,noatime            0 0
+/dev/vg0/lv_containerd  /var/lib/containerd   xfs    defaults,noatime,nodev,nosuid 0 0
+/dev/vg0/lv_log         /var/log             xfs    defaults,nodev,nosuid,noatime 0 0
+/dev/vg0/lv_home        /home                xfs    defaults,nodev,nosuid,noatime 0 0
+```
+
+> ⚠️ **`nofail` pada `/var/lib/etcd` adalah bug fatal**, bukan kenyamanan.
+> Kalau disk gagal mount tapi node tetap boot, etcd membuat database kosong di disk OS,
+> node join ulang sebagai member "baru", dan **quorum/data cluster hilang**.
+> Tanpa `nofail`, node gagal boot → alarm berbunyi → kamu sadar.
+
+#### BIOS, bukan UEFI
+
+Ganti `sda1` menjadi 1 MB `bios_grub` (ef02), lalu `sda2` jadi `/boot` 2 GB.
+AHV mendukung keduanya; pilih satu dan pakai konsisten di golden image.
+
+#### Kenapa `/var/lib/containerd` dipisah
+
+```
+tanpa filesystem terpisah:
+  nodefs  = /var   (termasuk image)
+  imagefs = sama   →  kubelet: "using nodefs for imagefs"
+  → evictionHard.imagefs.available DIABAIKAN
+  → satu image 8 GB bisa menghabiskan /var, kubelet mati
+
+dengan filesystem terpisah:
+  nodefs  = /var                  (12 GB CP / 40 GB worker)
+  imagefs = /var/lib/containerd   (18 GB CP / 120 GB worker)
+  → eviction bekerja independen
+```
+
+Verifikasi bahwa kubelet benar-benar melihat dua filesystem:
+
+```bash
+kubectl get --raw "/api/v1/nodes/k8s-w-01/proxy/stats/summary" \
+  | jq '{nodefs: .node.fs, imagefs: .node.runtime.imagefs}'
+```
+
+#### Menambah kapasitas
+
+LVM membuat ini bisa dilakukan online, tanpa rebuild node:
+
+```bash
+# 1. tambah ukuran vDisk di Prism, lalu resize partisi
+sudo growpart /dev/sda 3
+sudo pvresize /dev/sda3
+
+# 2. tambah LV yang penuh, lalu grow filesystem
+sudo lvextend -L +10G /dev/vg0/lv_var
+sudo xfs_growfs /var
+
+# untuk data disk ext4 (etcd)
+sudo growpart /dev/sdb 1
+sudo resize2fs /dev/sdb1
+```
+
+> **Catatan sizing:** 60 GB untuk OS control plane cukup untuk lab, tapi sempit untuk
+> upgrade beruntun dan retensi log. Kalau bisa, pakai **80 GB** — `lv_var` dan `lv_log`
+> mendapat ruang lebih lega tanpa mengubah layout lain.
+
 
 ### Port yang harus terbuka
 
