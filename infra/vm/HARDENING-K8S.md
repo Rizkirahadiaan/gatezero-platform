@@ -416,7 +416,7 @@ Cara menerapkan pengecualian di USG/OpenSCAP: lihat [`CIS-BENCHMARK.md`](CIS-BEN
 
 ```bash
 # siapa yang bisa apa
-kubectl auth can-i --list --as=ops@gatezero.lab
+kubectl auth can-i --list --as=ops@kirahadian.local
 kubectl auth can-i create pods --namespace apps-prod --as=system:serviceaccount:apps-prod:demo-api
 
 # cari yang terlalu longgar

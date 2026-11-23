@@ -3,7 +3,7 @@
 # Verifikasi nama key terhadap versi chart yang dipakai (values bisa berubah antar rilis).
 
 cluster:
-  name: gatezero
+  name: kirahadian.local
   id: 1
 
 # --- menggantikan kube-proxy (ADR-0008) ---

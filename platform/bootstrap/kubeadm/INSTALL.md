@@ -79,12 +79,12 @@ Yang akan terbentuk:
 | Variabel | Nilai contoh | Keterangan |
 |---|---|---|
 | `VIP` | `10.10.20.10` | Virtual IP API server |
-| `LB_HOST` | `k8s-api.gatezero.lab` | DNS → VIP |
+| `LB_HOST` | `k8s-api.kirahadian.local` | DNS → VIP |
 | `POD_CIDR` | `10.244.0.0/16` | harus tidak overlap dengan jaringan Nutanix |
 | `SVC_CIDR` | `10.96.0.0/12` | |
 | `IFACE` | `ens192` | cek `ip -br a` di VM |
 | `K8S_VER` | `1.34` | pin N-1 dari rilis terbaru |
-| `NEXUS` | `nexus.gatezero.lab` | artifact hub |
+| `NEXUS` | `nexus.kirahadian.local` | artifact hub |
 
 | Host | IP | vCPU | RAM | vDisk 1 (OS) | vDisk 2 (data) |
 |---|---|---|---|---|---|
@@ -253,7 +253,7 @@ Checklist sebelum menyentuh OS:
 - [ ] 3 CP + 3 worker dibuat dari **golden image** (bukan clone yang berbagi `machine-id`)
 - [ ] Setiap CP punya **vDisk terpisah** untuk `/var/lib/etcd` (lihat ADR-0009)
 - [ ] `chrony` menunjuk NTP internal (jangan `pool.ntp.org` publik)
-- [ ] DNS `k8s-api.gatezero.lab` → `10.10.20.10`
+- [ ] DNS `k8s-api.kirahadian.local` → `10.10.20.10`
 - [ ] VLAN yang sama untuk semua node (kube-vip mode ARP butuh L2 yang sama)
 - [ ] MTU: jika Nutanix memakai jumbo frame, catat MTU (akan dipakai Cilium)
 - [ ] Snapshot/Protection Domain VM untuk DR (bukan untuk backup etcd)
@@ -295,8 +295,8 @@ sudo apt-get install -y \
 
 ```bash
 sudo tee /etc/chrony/chrony.conf >/dev/null <<'EOF'
-server ntp1.gatezero.lab iburst
-server ntp2.gatezero.lab iburst
+server ntp1.kirahadian.local iburst
+server ntp2.kirahadian.local iburst
 driftfile /var/lib/chrony/drift
 makestep 1.0 3
 rtcsync
@@ -505,13 +505,13 @@ sudo mkdir -p /etc/containerd/certs.d/{docker.io,registry.k8s.io}
 
 sudo tee /etc/containerd/certs.d/registry.k8s.io/hosts.toml >/dev/null <<EOF
 server = "https://registry.k8s.io"
-[host."https://nexus.gatezero.lab:8084"]
+[host."https://nexus.kirahadian.local:8084"]
   capabilities = ["pull", "resolve"]
 EOF
 
 sudo tee /etc/containerd/certs.d/docker.io/hosts.toml >/dev/null <<EOF
 server = "https://registry-1.docker.io"
-[host."https://nexus.gatezero.lab:8083"]
+[host."https://nexus.kirahadian.local:8083"]
   capabilities = ["pull", "resolve"]
 EOF
 ```
@@ -680,7 +680,7 @@ apiServer:
     - 10.10.20.11
     - 10.10.20.12
     - 10.10.20.13
-    - k8s-api.gatezero.lab
+    - k8s-api.kirahadian.local
   extraArgs:
     - name: audit-policy-file
       value: /etc/kubernetes/audit/policy.yaml
@@ -1049,7 +1049,7 @@ Simpan sebagai `platform/bootstrap/cilium/values.yaml`:
 
 ```yaml
 cluster:
-  name: gatezero
+  name: kirahadian.local
   id: 1
 
 kubeProxyReplacement: true
@@ -1205,7 +1205,7 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: ops@gatezero.lab
+    email: ops@kirahadian.local
     privateKeySecretRef:
       name: letsencrypt-dns-account
     solvers:
@@ -1216,20 +1216,20 @@ spec:
               key: api-token
         selector:
           dnsZones:
-            - gatezero.lab
+            - kirahadian.local
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: wildcard-gatezero
+  name: wildcard-kirahadian
   namespace: cert-manager
 spec:
-  secretName: wildcard-gatezero-tls
+  secretName: wildcard-kirahadian-tls
   issuerRef:
     name: letsencrypt-dns
     kind: ClusterIssuer
   dnsNames:
-    - "*.apps.gatezero.lab"
+    - "*.apps.kirahadian.local"
 ```
 
 ```bash
@@ -1408,7 +1408,7 @@ Tambahkan ke apiserver (`extraArgs`) setelah issuer OIDC stabil:
 
 ```yaml
 - name: oidc-issuer-url
-  value: https://gitlab.gatezero.lab
+  value: https://gitlab.kirahadian.local
 - name: oidc-client-id
   value: gatezero-k8s
 - name: oidc-username-claim

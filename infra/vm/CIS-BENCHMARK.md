@@ -398,7 +398,7 @@ Pakai Pushgateway (tidak butuh agent di setiap VM):
 HOST=$(hostname)
 LYNIS=$(grep '^hardening_index' /var/log/lynis-report.dat | cut -d= -f2)
 
-cat <<EOF | curl --data-binary @- http://pushgw.gatezero.lab:9091/metrics/job/cis_audit/instance/${HOST}
+cat <<EOF | curl --data-binary @- http://pushgw.kirahadian.local:9091/metrics/job/cis_audit/instance/${HOST}
 # TYPE compliance_score gauge
 compliance_score{source="lynis",host="${HOST}"} ${LYNIS}
 compliance_score{source="usg",host="${HOST}"} ${USG_SCORE}

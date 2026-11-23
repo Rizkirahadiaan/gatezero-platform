@@ -17,7 +17,7 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: ops@gatezero.lab
+    email: ops@kirahadian.local
     privateKeySecretRef:
       name: letsencrypt-dns-account
     solvers:
@@ -28,7 +28,7 @@ spec:
               key: api-token
         selector:
           dnsZones:
-            - gatezero.lab
+            - kirahadian.local
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -37,7 +37,7 @@ metadata:
 spec:
   acme:
     server: https://acme-staging-v02.api.letsencrypt.org/directory
-    email: ops@gatezero.lab
+    email: ops@kirahadian.local
     privateKeySecretRef:
       name: letsencrypt-staging-account
     solvers:
@@ -48,18 +48,18 @@ spec:
               key: api-token
         selector:
           dnsZones:
-            - gatezero.lab
+            - kirahadian.local
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: wildcard-gatezero
+  name: wildcard-kirahadian
   namespace: cert-manager
 spec:
-  secretName: wildcard-gatezero-tls
+  secretName: wildcard-kirahadian-tls
   issuerRef:
     name: letsencrypt-dns
     kind: ClusterIssuer
   dnsNames:
-    - "*.apps.gatezero.lab"
-    - "apps.gatezero.lab"
+    - "*.apps.kirahadian.local"
+    - "apps.kirahadian.local"

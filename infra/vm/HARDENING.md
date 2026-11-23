@@ -56,7 +56,7 @@ akan membawa masalah yang tidak bisa ditambal belakangan.
 ```yaml
 #cloud-config
 hostname: ${VM_NAME}
-fqdn: ${VM_NAME}.gatezero.lab
+fqdn: ${VM_NAME}.kirahadian.local
 timezone: Asia/Jakarta
 prefer_fqdn_over_hostname: true
 
@@ -588,7 +588,7 @@ minimal:
 ```bash
 # rsyslog ke collector
 sudo tee /etc/rsyslog.d/50-remote.conf >/dev/null <<'EOF'
-*.* @@log-collector.gatezero.lab:6514
+*.* @@log-collector.kirahadian.local:6514
 EOF
 ```
 

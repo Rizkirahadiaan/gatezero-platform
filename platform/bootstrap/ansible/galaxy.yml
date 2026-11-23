@@ -12,7 +12,7 @@ name: kubeadm_bootstrap
 version: 0.1.0
 readme: README.md
 authors:
-  - gatezero platform team <ops@gatezero.lab>
+  - kirahadian platform team <ops@kirahadian.local>
 description: >-
   Production-grade Kubernetes bootstrap dengan kubeadm HA: baseline OS, etcd di
   vDisk terpisah, containerd (v2/v3 aware), kube-vip, Cilium tanpa kube-proxy,

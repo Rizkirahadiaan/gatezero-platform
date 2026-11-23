@@ -445,7 +445,7 @@ Dan ringkasan:
 ```
 ok: [k8s-cp-01] => {
     "msg": [
-        "Cluster : gatezero",
+        "Cluster : kirahadian.local",
         "Versi   : 1.34.5",
         "Node    : 6/6 Ready",
         "etcd    : healthy",

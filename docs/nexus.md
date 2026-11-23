@@ -51,7 +51,7 @@ metadata:
   namespace: apps
 type: kubernetes.io/dockerconfigjson
 stringData:
-  .dockerconfigjson: '{"auths":{"nexus.gatezero.lab:8082":{"auth":"..."}}}'
+  .dockerconfigjson: '{"auths":{"nexus.kirahadian.local:8082":{"auth":"..."}}}'
 ```
 
 > Status: **stub**. Isi setelah fase 2 dikerjakan.

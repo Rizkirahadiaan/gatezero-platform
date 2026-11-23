@@ -7,8 +7,8 @@
 # --- waktu ---------------------------------------------------------------
 os_timezone: Asia/Jakarta
 ntp_servers:
-  - ntp1.gatezero.lab
-  - ntp2.gatezero.lab
+  - ntp1.kirahadian.local
+  - ntp2.kirahadian.local
 
 # --- identitas akses -----------------------------------------------------
 ssh_port: 22

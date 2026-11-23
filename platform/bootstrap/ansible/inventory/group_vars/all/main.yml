@@ -5,13 +5,13 @@
 # ============================================================================
 
 # --- identitas cluster -------------------------------------------------------
-cluster_name: gatezero.kira.local
+cluster_name: kirahadian.local
 
 # --- base image / OS ---------------------------------------------------------
 os_timezone: Asia/Jakarta
 ntp_servers:
-  - ntp1.gatezero.lab
-  - ntp2.gatezero.lab
+  - ntp1.kirahadian.local
+  - ntp2.kirahadian.local
 
 # --- versi Kubernetes (PIN, jangan pakai "latest") ---------------------------
 # k8s_version     -> dipakai di ClusterConfiguration.kubernetesVersion
@@ -26,7 +26,7 @@ kubevip_address: "10.10.20.10"
 kubevip_interface: "ens192"
 kubevip_version: "v0.8.7"
 kubevip_port: 6443
-api_dns_name: "k8s-api.gatezero.lab"
+api_dns_name: "k8s-api.kirahadian.local"
 control_plane_endpoint: "{{ kubevip_address }}:{{ kubevip_port }}"
 
 # --- jaringan cluster --------------------------------------------------------
@@ -48,7 +48,7 @@ containerd_package: "containerd.io"
 # Mirror ke Nexus. Default OFF karena mengubah config.toml dan
 # membutuhkan verifikasi manual: containerd config dump.
 nexus_mirror_enabled: false
-nexus_host: "nexus.gatezero.lab"
+nexus_host: "nexus.kirahadian.local"
 nexus_docker_proxy_port: 8083
 nexus_k8s_proxy_port: 8084
 
@@ -60,8 +60,8 @@ cert_manager_version: "v1.16.2"
 metrics_server_version: "3.12.2"
 
 # --- TLS / DNS-01 ------------------------------------------------------------
-acme_email: "ops@gatezero.lab"
-base_domain: "gatezero.lab"
+acme_email: "ops@kirahadian.local"
+base_domain: "kirahadian.local"
 
 # --- namespace aplikasi (dibuat + dilabeli PSA restricted) -------------------
 app_namespaces:

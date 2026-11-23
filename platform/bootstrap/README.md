@@ -52,7 +52,7 @@ performa harus diambil sebelum hardening supaya delta-nya bisa diukur.
 - 3 VM control plane (4 vCPU / 8 GB / 60 GB + vDisk etcd 40 GB)
 - 3 VM worker (8 vCPU / 16 GB / 200 GB)
 - VIP `10.10.20.10` di VLAN yang sama (mode ARP kube-vip)
-- DNS: `k8s-api.gatezero.lab` → VIP
+- DNS: `k8s-api.kirahadian.local` → VIP
 - Ubuntu 24.04, chrony sinkron, swap off, containerd 2.x
 
 ## Secret bootstrap
