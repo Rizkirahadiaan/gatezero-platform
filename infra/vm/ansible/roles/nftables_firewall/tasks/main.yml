@@ -43,7 +43,7 @@
     msg: >-
       ufw aktif di {{ inventory_hostname }}. Matikan dulu:
       `ufw disable` — ufw dan nftables/Cilium berebut aturan.
-  when: ufw_status.stdout is search('Status: active')
+  when: "ufw_status.stdout is search('Status: active')"
 
 - name: Simpan ruleset saat ini sebagai backup
   ansible.builtin.shell: |

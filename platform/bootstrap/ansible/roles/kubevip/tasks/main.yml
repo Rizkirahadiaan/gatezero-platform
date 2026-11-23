@@ -33,7 +33,7 @@
 - name: Gagal kalau manifest tidak bisa diparse
   ansible.builtin.fail:
     msg: "Manifest kube-vip tidak valid: {{ vip_dryrun.stderr }}"
-  when: vip_dryrun.stderr is search('error parsing|yaml: ')
+  when: "vip_dryrun.stderr is search('error parsing|yaml: ')"
 
 - name: Tampilkan ringkasan VIP
   ansible.builtin.debug:
