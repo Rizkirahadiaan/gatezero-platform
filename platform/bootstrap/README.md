@@ -36,7 +36,7 @@ Kalau keduanya berbeda, `INSTALL.md` yang benar.
 
 ```
 1. provision VM + cloud-init
-2. hardening OS (infra/vm/ansible)   <- sebelum k8s
+2. hardening OS (infra/vm/HARDENING.md)   <- sebelum k8s
 3. benchmark baseline (infra/benchmark)
 4. kubeadm init HA + join            <- INSTALL.md
 5. cilium
