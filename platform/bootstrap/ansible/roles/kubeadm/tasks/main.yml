@@ -1,0 +1,160 @@
+---
+# Init control plane pertama. Idempoten: dijaga oleh keberadaan admin.conf.
+
+- name: Validasi secret bootstrap tersedia
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'K8S_CERT_KEY') | length == 64
+      - lookup('env', 'K8S_ENCRYPTION_KEY') | length >= 44
+    fail_msg: >-
+      Secret kosong. Jalankan melalui ./run.sh (sops exec-env), bukan
+      ansible-playbook langsung.
+
+- name: Buat direktori audit & enkripsi
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/kubernetes/audit
+    - /etc/kubernetes/enc
+    - /var/log/kubernetes
+
+- name: Template audit policy
+  ansible.builtin.template:
+    src: audit-policy.yaml.j2
+    dest: /etc/kubernetes/audit/policy.yaml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Template encryption config (berisi key)
+  ansible.builtin.template:
+    src: encryption-config.yaml.j2
+    dest: /etc/kubernetes/enc/encryption-config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Template kubeadm-config
+  ansible.builtin.template:
+    src: kubeadm-config.yaml.j2
+    dest: /root/kubeadm-config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Cek apakah cluster sudah pernah di-init
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: admin_conf
+
+- name: Preflight kubeadm (dry-run)
+  ansible.builtin.command: >-
+    kubeadm init --config /root/kubeadm-config.yaml --dry-run
+  register: kubeadm_dryrun
+  changed_when: false
+  when: not admin_conf.stat.exists
+
+# shell (bukan command) supaya $K8S_CERT_KEY diekspansi oleh bash.
+# Dengan cara ini nilai key TIDAK muncul di log Ansible (cmd hanya berisi
+# nama variabel). Exposure di `ps` hanya selama proses init berjalan,
+# dan hanya terlihat oleh root — yang memang sudah memegang admin.conf.
+- name: Init cluster
+  ansible.builtin.shell: |
+    set -eu
+    exec kubeadm init \
+      --config /root/kubeadm-config.yaml \
+      --upload-certs \
+      --certificate-key "$K8S_CERT_KEY" \
+      --skip-phases=addon/kube-proxy
+  args:
+    executable: /bin/bash
+  environment:
+    K8S_CERT_KEY: "{{ lookup('env', 'K8S_CERT_KEY') }}"
+  register: kubeadm_init
+  when: not admin_conf.stat.exists
+
+- name: Tampilkan ringkasan init
+  ansible.builtin.debug:
+    msg: "{{ 'Cluster BARU di-init' if kubeadm_init is changed else 'Cluster sudah ada — init dilewati' }}"
+
+- name: Buat kubeconfig untuk root
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Salin admin.conf ke /root/.kube/config
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Ambil kubeconfig ke controller (untuk helm/kubectl)
+  ansible.builtin.fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ artifacts_dir }}/kubeconfig/config"
+    flat: true
+    mode: "0600"
+
+- name: Terapkan RBAC kube-vip
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ role_path }}/../kubevip/files/kube-vip-rbac.yaml"
+    kubeconfig: "{{ kubeconfig_path }}"
+
+# --- data untuk join -------------------------------------------------------
+
+- name: Hitung discovery token CA hash
+  ansible.builtin.shell: |
+    set -eu
+    openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt \
+      | openssl pkey -pubin -outform der 2>/dev/null \
+      | openssl dgst -sha256 -hex | sed 's/^.* //'
+  args:
+    executable: /bin/bash
+  register: ca_hash
+  changed_when: false
+
+- name: Buat token join (ttl 1 jam, cukup untuk satu run)
+  ansible.builtin.command: kubeadm token create --ttl 1h
+  register: join_token
+  changed_when: true
+  no_log: true
+
+- name: Bagikan data join ke play berikutnya
+  ansible.builtin.set_fact:
+    kubeadm_join_token: "{{ join_token.stdout | trim }}"
+    kubeadm_ca_hash: "sha256:{{ ca_hash.stdout | trim }}"
+    kubeadm_cert_key: "{{ lookup('env', 'K8S_CERT_KEY') }}"
+  no_log: true
+
+- name: Tunggu apiserver melayani
+  ansible.builtin.command: kubectl get --raw /healthz
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: api_health
+  until: api_health.stdout is search('^ok')
+  retries: 30
+  delay: 5
+  changed_when: false
+
+- name: Tampilkan status node
+  ansible.builtin.command: kubectl get nodes -o wide
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: nodes_now
+  changed_when: false
+
+- name: Status awal cluster
+  ansible.builtin.debug:
+    msg: "{{ nodes_now.stdout_lines }}"

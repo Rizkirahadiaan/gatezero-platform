@@ -1,0 +1,86 @@
+---
+# Join node ke cluster yang sudah di-init.
+# Data join (token, hash, cert key) diambil dari host primer via set_fact
+# yang disimpan pada play 06.
+
+- name: Ambil data join dari control plane primer
+  ansible.builtin.set_fact:
+    _primary: "{{ hostvars[groups['k8s_cp_primary'][0]] }}"
+  no_log: true
+
+- name: Pastikan data join tersedia
+  ansible.builtin.assert:
+    that:
+      - _primary.kubeadm_join_token is defined
+      - _primary.kubeadm_ca_hash is defined
+    fail_msg: >-
+      Data join tidak ditemukan. Jalankan playbook 60-init.yml lebih dulu
+      dalam run yang sama (atau gunakan site.yml).
+
+- name: Cek node sudah pernah join
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+# --- control plane ---------------------------------------------------------
+
+- name: Join sebagai control plane
+  ansible.builtin.command: >-
+    kubeadm join {{ control_plane_endpoint }}
+    --token {{ _primary.kubeadm_join_token }}
+    --discovery-token-ca-cert-hash {{ _primary.kubeadm_ca_hash }}
+    --control-plane
+    --certificate-key {{ _primary.kubeadm_cert_key }}
+    --apiserver-advertise-address {{ node_ip }}
+    --node-name {{ inventory_hostname }}
+    --cri-socket unix:///run/containerd/containerd.sock
+  when:
+    - not kubelet_conf.stat.exists
+    - inventory_hostname in groups['k8s_cp_secondary']
+  register: join_cp
+  no_log: true
+
+# --- worker ----------------------------------------------------------------
+
+- name: Join sebagai worker
+  ansible.builtin.command: >-
+    kubeadm join {{ control_plane_endpoint }}
+    --token {{ _primary.kubeadm_join_token }}
+    --discovery-token-ca-cert-hash {{ _primary.kubeadm_ca_hash }}
+    --node-name {{ inventory_hostname }}
+    --cri-socket unix:///run/containerd/containerd.sock
+  when:
+    - not kubelet_conf.stat.exists
+    - inventory_hostname in groups['k8s_workers']
+  register: join_worker
+  no_log: true
+
+- name: Tampilkan hasil join
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}:
+      {{ 'sudah join sebelumnya (dilewati)'
+         if kubelet_conf.stat.exists
+         else 'join selesai' }}
+
+# --- kubeconfig untuk CP tambahan -----------------------------------------
+
+- name: Siapkan kubeconfig root (control plane)
+  when: inventory_hostname in groups['k8s_cp_secondary']
+  block:
+    - name: Buat direktori .kube
+      ansible.builtin.file:
+        path: /root/.kube
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Salin admin.conf
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0600"

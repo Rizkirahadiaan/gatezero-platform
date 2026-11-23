@@ -1,0 +1,42 @@
+---
+# kube-vip static pod.
+#
+# Catatan penting: pod ini butuh /etc/kubernetes/admin.conf untuk leader
+# election. Sebelum `kubeadm init`, file itu belum ada -> pod akan restart
+# sampai init selesai. Itu NORMAL dan bukan indikasi kegagalan.
+
+- name: Buat direktori manifest static pod
+  ansible.builtin.file:
+    path: /etc/kubernetes/manifests
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Template manifest kube-vip
+  ansible.builtin.template:
+    src: kube-vip.yaml.j2
+    dest: /etc/kubernetes/manifests/kube-vip.yaml
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Verifikasi manifest valid secara YAML
+  ansible.builtin.command: >-
+    kubectl apply --dry-run=client -f /etc/kubernetes/manifests/kube-vip.yaml
+  register: vip_dryrun
+  changed_when: false
+  failed_when: false
+  # dry-run terhadap kluster belum ada akan gagal koneksi; abaikan,
+  # yang penting parse YAML sukses (bukan "error: error parsing").
+
+- name: Gagal kalau manifest tidak bisa diparse
+  ansible.builtin.fail:
+    msg: "Manifest kube-vip tidak valid: {{ vip_dryrun.stderr }}"
+  when: vip_dryrun.stderr is search('error parsing|yaml: ')
+
+- name: Tampilkan ringkasan VIP
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: VIP {{ kubevip_address }} via {{ kubevip_interface }}
+      ({{ kubevip_version }}), port {{ kubevip_port }}

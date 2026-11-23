@@ -1,0 +1,6 @@
+---
+cluster_name: kubernetes
+k8s_version: "1.34.5"
+kubevip_address: "192.168.1.100"
+kubevip_port: 6443
+kubeconfig_path: /root/.kube/config

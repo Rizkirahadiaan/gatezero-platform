@@ -1,0 +1,25 @@
+---
+# ============================================================================
+# gatezero-platform — bootstrap cluster Kubernetes (kubeadm, HA)
+#
+# Jalankan LENGKAP:
+#   ./run.sh site.yml
+#
+# Jalankan bertahap (disarankan saat pertama kali):
+#   ./run.sh playbooks/00-preflight.yml
+#   ./run.sh playbooks/10-baseline.yml
+#   ... dst
+#
+# Semua play dirancang IDEMPOTEN: aman dijalankan ulang.
+# ============================================================================
+
+- import_playbook: playbooks/00-preflight.yml
+- import_playbook: playbooks/10-baseline.yml
+- import_playbook: playbooks/20-etcd-disk.yml
+- import_playbook: playbooks/30-containerd.yml
+- import_playbook: playbooks/40-kubernetes.yml
+- import_playbook: playbooks/50-kube-vip.yml
+- import_playbook: playbooks/60-init.yml
+- import_playbook: playbooks/70-join.yml
+- import_playbook: playbooks/80-addons.yml
+- import_playbook: playbooks/90-verify.yml

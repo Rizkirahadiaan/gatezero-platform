@@ -1,0 +1,65 @@
+---
+# Cilium: CNI + pengganti kube-proxy / MetalLB / ingress (ADR-0008).
+
+- name: Tambah repo Helm Cilium
+  kubernetes.core.helm_repository:
+    name: cilium
+    repo_url: https://helm.cilium.io/
+
+- name: Install / upgrade Cilium
+  kubernetes.core.helm:
+    name: cilium
+    chart_ref: cilium/cilium
+    chart_version: "{{ cilium_version }}"
+    release_namespace: kube-system
+    kubeconfig: "{{ kubeconfig_path }}"
+    values_files: "{{ [cilium_values_file] if cilium_values_file | default('') | length > 0 else [] }}"
+    # override nilai yang bergantung pada environment
+    values:
+      k8sServiceHost: "{{ kubevip_address }}"
+      k8sServicePort: "{{ kubevip_port }}"
+      MTU: "{{ cilium_mtu }}"
+      cluster:
+        name: "{{ cluster_name }}"
+    wait: true
+    timeout: 10m0s
+    atomic: false
+
+- name: Tunggu semua node Ready
+  ansible.builtin.command: >-
+    kubectl wait --for=condition=Ready node --all --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: nodes_ready
+  changed_when: false
+  retries: 12
+  delay: 10
+  until: nodes_ready.rc == 0
+
+- name: Pastikan kube-proxy benar-benar tidak ada
+  ansible.builtin.shell: |
+    set -eu
+    if kubectl -n kube-system get ds kube-proxy >/dev/null 2>&1; then
+      echo "PRESENT"
+    else
+      echo "ABSENT"
+    fi
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: kube_proxy
+  changed_when: false
+  failed_when: kube_proxy.stdout | trim != 'ABSENT'
+
+- name: Status Cilium
+  ansible.builtin.command: kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium status --brief
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: cilium_status
+  changed_when: false
+  failed_when: false
+
+- name: Tampilkan ringkasan Cilium
+  ansible.builtin.debug:
+    msg: "{{ cilium_status.stdout_lines | default(['(status tidak tersedia)']) }}"

@@ -1,0 +1,39 @@
+# Normalisasi line ending.
+#
+# Tanpa file ini, git di Windows (core.autocrlf=true) mengubah skrip .sh
+# menjadi CRLF saat checkout, sehingga muncul:
+#   bash: ./run.sh: /usr/bin/env: bad interpreter: No such file or directory
+#
+# Aturan: semua teks = LF di repo. Hanya file Windows yang CRLF.
+
+* text=auto eol=lf
+
+# skrip & config yang dieksekusi di Linux
+*.sh       text eol=lf
+*.bash     text eol=lf
+Makefile   text eol=lf
+justfile   text eol=lf
+Dockerfile text eol=lf
+*.j2       text eol=lf
+*.yaml     text eol=lf
+*.yml      text eol=lf
+*.toml     text eol=lf
+*.conf     text eol=lf
+*.md       text eol=lf
+*.env      text eol=lf
+*.example  text eol=lf
+*.rst      text eol=lf
+
+# file khusus Windows
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# biner — jangan disentuh
+*.drawio -text
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.gz     binary
+*.tar    binary

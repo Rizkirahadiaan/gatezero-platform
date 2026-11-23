@@ -1,0 +1,15 @@
+---
+cluster_name: kubernetes
+node_ip: "{{ ansible_host }}"
+kubevip_address: "192.168.1.100"
+kubevip_port: 6443
+control_plane_endpoint: "{{ kubevip_address }}:{{ kubevip_port }}"
+api_dns_name: k8s-api.example.com
+
+pod_subnet: "10.244.0.0/16"
+service_subnet: "10.96.0.0/12"
+dns_domain: cluster.local
+
+etcd_mount: /var/lib/etcd
+kubeconfig_path: /root/.kube/config
+artifacts_dir: "{{ playbook_dir }}/../../artifacts"

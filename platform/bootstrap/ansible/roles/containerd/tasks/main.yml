@@ -1,0 +1,157 @@
+---
+# containerd 2.x + verifikasi konfigurasi yang paling sering salah.
+
+- name: Pastikan direktori keyring ada
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ambil GPG key Docker
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+
+- name: Map arsitektur untuk repo Docker
+  ansible.builtin.set_fact:
+    docker_arch: >-
+      {{ 'amd64' if ansible_architecture == 'x86_64'
+         else ('arm64' if ansible_architecture == 'aarch64'
+         else ansible_architecture) }}
+
+- name: Tambah repo Docker
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    filename: docker
+    state: present
+    update_cache: true
+
+- name: Install containerd
+  ansible.builtin.apt:
+    name: "{{ containerd_package }}"
+    state: present
+
+# --- konfigurasi -----------------------------------------------------------
+
+- name: Cek config.toml yang sudah ada
+  ansible.builtin.stat:
+    path: /etc/containerd/config.toml
+  register: containerd_cfg
+
+- name: Generate config default (hanya sekali)
+  ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+  when: not containerd_cfg.stat.exists
+
+- name: Deteksi versi skema config (v2 vs v3)
+  ansible.builtin.shell: |
+    set -eu
+    if grep -Eq '^version[[:space:]]*=[[:space:]]*3' /etc/containerd/config.toml; then
+      echo v3
+    else
+      echo v2
+    fi
+  args:
+    executable: /bin/bash
+  register: containerd_schema
+  changed_when: false
+
+- name: Paksa SystemdCgroup = true (WAJIB)
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: '^(\s*)SystemdCgroup\s*=\s*false'
+    replace: '\1SystemdCgroup = true'
+  notify: restart containerd
+
+- name: Set pause image (config v2)
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: '^(\s*)sandbox_image\s*=\s*.*$'
+    replace: '\1sandbox_image = "{{ containerd_sandbox_image }}"'
+  when: containerd_schema.stdout == 'v2'
+  notify: restart containerd
+
+- name: Set pause image (config v3 / containerd 2.x)
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: '^(\s*)sandbox\s*=\s*.*$'
+    replace: '\1sandbox = "{{ containerd_sandbox_image }}"'
+  when: containerd_schema.stdout == 'v3'
+  notify: restart containerd
+
+# --- mirror Nexus (opsional, default OFF) ----------------------------------
+# Mengubah config.toml; setelah diaktifkan verifikasi dengan:
+#   containerd config dump | grep -A3 config_path
+
+- name: Buat direktori certs.d untuk mirror
+  ansible.builtin.file:
+    path: "/etc/containerd/certs.d/{{ item.name }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - { name: docker.io,        server: "https://registry-1.docker.io", port: "{{ nexus_docker_proxy_port }}" }
+    - { name: registry.k8s.io,  server: "https://registry.k8s.io",      port: "{{ nexus_k8s_proxy_port }}" }
+  when: nexus_mirror_enabled | bool
+
+- name: Template hosts.toml mirror Nexus
+  ansible.builtin.template:
+    src: hosts.toml.j2
+    dest: "/etc/containerd/certs.d/{{ item.name }}/hosts.toml"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - { name: docker.io,        server: "https://registry-1.docker.io", port: "{{ nexus_docker_proxy_port }}" }
+    - { name: registry.k8s.io,  server: "https://registry.k8s.io",      port: "{{ nexus_k8s_proxy_port }}" }
+  when: nexus_mirror_enabled | bool
+  notify: restart containerd
+
+- name: Aktifkan config_path untuk certs.d
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: '^(\s*)config_path\s*=\s*.*$'
+    replace: '\1config_path = "/etc/containerd/certs.d"'
+  when: nexus_mirror_enabled | bool
+  notify: restart containerd
+
+# --- layanan & verifikasi --------------------------------------------------
+
+- name: Aktifkan & jalankan containerd
+  ansible.builtin.service:
+    name: containerd
+    state: started
+    enabled: true
+
+- name: Verifikasi containerd aktif
+  ansible.builtin.command: systemctl is-active containerd
+  register: containerd_state
+  changed_when: false
+  failed_when: containerd_state.stdout | trim != 'active'
+
+- name: Verifikasi SystemdCgroup benar-benar true
+  ansible.builtin.shell: |
+    set -eu
+    count=$(grep -c 'SystemdCgroup = true' /etc/containerd/config.toml || true)
+    [ "$count" -ge 1 ] && echo "OK:$count" || echo "FAIL"
+  args:
+    executable: /bin/bash
+  register: cgroup_check
+  changed_when: false
+  failed_when: cgroup_check.stdout is not search('^OK')
+
+- name: Tampilkan status containerd
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: containerd {{ 'active' if containerd_state.stdout == 'active' else 'NOT ACTIVE' }},
+      schema {{ containerd_schema.stdout }}, SystemdCgroup {{ cgroup_check.stdout }}

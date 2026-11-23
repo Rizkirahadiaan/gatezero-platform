@@ -1,0 +1,7 @@
+---
+- name: "06 | Init cluster (control plane pertama)"
+  hosts: k8s_cp_primary
+  become: true
+  gather_facts: true
+  roles:
+    - kubeadm

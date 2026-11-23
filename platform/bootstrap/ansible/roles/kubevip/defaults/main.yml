@@ -1,0 +1,5 @@
+---
+kubevip_address: "192.168.1.100"
+kubevip_interface: eth0
+kubevip_version: "v0.8.7"
+kubevip_port: 6443

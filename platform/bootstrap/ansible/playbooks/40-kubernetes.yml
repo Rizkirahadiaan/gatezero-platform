@@ -1,0 +1,7 @@
+---
+- name: "04 | Paket kubelet / kubeadm / kubectl"
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  roles:
+    - kubernetes

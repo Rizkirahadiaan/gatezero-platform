@@ -1,0 +1,34 @@
+# Trivy ignorefile
+#
+# Format terstruktur (dipakai dengan `trivy --ignorefile security/trivy/ignore.yaml`).
+# Setiap entri WAJIB punya: statement (alasan + mitigasi) dan expired_at.
+# Entri tanpa expired_at akan ditolak saat review.
+#
+# Cara pakai di CI:
+#   trivy image --ignorefile security/trivy/ignore.yaml \
+#               --severity HIGH,CRITICAL --exit-code 1 $IMAGE
+
+vulnerabilities:
+  # Contoh format — hapus blok ini saat sudah ada temuan nyata.
+  - id: CVE-0000-00000
+    paths:
+      - "usr/local/bin/demo-api"
+    statement: >-
+      CONTOH SAJA (bukan temuan nyata). Placeholder untuk mendokumentasikan
+      cara menulis pengecualian: sebutkan CVE, alasan tidak exploitable di
+      konteks kita, dan mitigasi yang dipasang.
+    expired_at: 2026-12-31
+
+# Penjelasan yang diterima sebagai alasan sah:
+#   - kode rentan tidak reachable (dead code / build tag tidak aktif)
+#   - kompensasi di layer lain (NetworkPolicy, WAF, read-only mount)
+#   - belum ada patch upstream + fitur dinonaktifkan sementara
+#
+# Yang TIDAK diterima:
+#   - "supaya pipeline hijau"
+#   - "nanti saja"
+#   - tanpa expired_at
+
+misconfigurations: []
+secrets: []
+licenses: []

@@ -1,0 +1,76 @@
+---
+# Paket Kubernetes dengan versi di-pin + hold.
+# Upgrade dilakukan lewat runbook, bukan `apt upgrade`.
+
+- name: Ambil GPG key repo Kubernetes
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_repo_minor }}/deb/Release.key"
+    dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+
+- name: Tambah repo Kubernetes
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc]
+      https://pkgs.k8s.io/core:/stable:/v{{ k8s_repo_minor }}/deb/ /
+    filename: kubernetes
+    state: present
+    update_cache: true
+
+- name: Ambil daftar versi yang tersedia
+  ansible.builtin.command: apt-cache madison kubeadm
+  register: madison
+  changed_when: false
+
+- name: Pastikan versi yang di-pin tersedia di repo
+  ansible.builtin.assert:
+    that:
+      - k8s_pkg_version in madison.stdout
+    fail_msg: >-
+      Versi {{ k8s_pkg_version }} tidak tersedia di repo v{{ k8s_repo_minor }}.
+      Tersedia: {{ madison.stdout_lines | join(' | ') }}
+      Sesuaikan k8s_pkg_version di group_vars.
+
+- name: Install kubelet / kubeadm / kubectl (versi di-pin)
+  ansible.builtin.apt:
+    name:
+      - "kubelet={{ k8s_pkg_version }}"
+      - "kubeadm={{ k8s_pkg_version }}"
+      - "kubectl={{ k8s_pkg_version }}"
+    state: present
+    allow_change_held_packages: true
+    update_cache: true
+  register: k8s_pkg_install
+  retries: 2
+  delay: 5
+  until: k8s_pkg_install is succeeded
+
+- name: Hold paket agar tidak ikut apt upgrade
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Aktifkan layanan kubelet (belum di-start — menunggu kubeadm)
+  ansible.builtin.service:
+    name: kubelet
+    enabled: true
+
+- name: Verifikasi versi identik di semua node
+  ansible.builtin.command: "{{ item }}"
+  register: ver
+  changed_when: false
+  loop:
+    - kubeadm version -o short
+    - kubectl version --client -o json
+    - kubelet --version
+
+- name: Tampilkan versi
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: {{ ver.results | map(attribute='stdout') | list | join(' / ') }}"

@@ -1,0 +1,8 @@
+---
+- name: "08 | CNI Cilium + addon (Gateway API, cert-manager, metrics-server)"
+  hosts: k8s_cp_primary
+  become: true
+  gather_facts: false
+  roles:
+    - cilium
+    - addons

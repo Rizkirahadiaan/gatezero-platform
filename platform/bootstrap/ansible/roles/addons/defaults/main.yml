@@ -1,0 +1,9 @@
+---
+gateway_api_version: "v1.2.1"
+cert_manager_version: "v1.16.2"
+metrics_server_version: "3.12.2"
+app_namespaces:
+  - apps-dev
+  - apps-staging
+  - apps-prod
+kubeconfig_path: /root/.kube/config

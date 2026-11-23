@@ -1,0 +1,7 @@
+---
+- name: "09 | Verifikasi cluster"
+  hosts: k8s_cp_primary
+  become: true
+  gather_facts: false
+  roles:
+    - verify

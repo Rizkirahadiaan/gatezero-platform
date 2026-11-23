@@ -1,0 +1,4 @@
+server = "{{ item.server }}"
+
+[host."https://{{ nexus_host }}:{{ item.port }}"]
+  capabilities = ["pull", "resolve"]

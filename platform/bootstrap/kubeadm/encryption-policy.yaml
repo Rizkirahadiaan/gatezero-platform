@@ -1,0 +1,28 @@
+# EncryptionConfiguration — TEMPLATE, JANGAN commit dengan key asli.
+#
+# Cara pakai:
+#   1. generate key:
+#        KEY=$(head -c 32 /dev/urandom | base64)
+#   2. isi ke salinan sementara di /etc/kubernetes/enc/encryption-config.yaml
+#   3. enkripsi salinannya dengan SOPS -> encryption-config.enc.yaml
+#   4. HAPUS template terisi dari disk/repo
+#
+# ⚠️ Kehilangan key = semua Secret tidak bisa dibaca. Simpan salinan offline
+#    bersama backup PKI (lihat INSTALL.md bagian 16.2).
+#
+# aescbc dipilih karena didukung semua versi dan tidak butuh KMS plugin.
+# Jalur upgrade: kms v2 ke OpenBao setelah cluster stabil.
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: REPLACE_WITH_32_BYTE_BASE64
+      # identity HARUS tetap ada dan di urutan terakhir, kalau tidak
+      # resource lama yang belum terenkripsi tidak bisa dibaca.
+      - identity: {}

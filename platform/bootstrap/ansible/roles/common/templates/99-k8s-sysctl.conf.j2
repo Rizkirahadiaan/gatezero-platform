@@ -1,0 +1,28 @@
+# Sysctl wajib Kubernetes + tuning untuk beban platform.
+# Dikelola Ansible (role common). Jangan edit manual.
+
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+net.ipv6.conf.all.forwarding        = 1
+
+# inotify: Prometheus / ArgoCD / CSI membuka banyak watch.
+# Default 8192 -> pod stuck ContainerCreating tanpa error jelas.
+fs.inotify.max_user_watches   = 1048576
+fs.inotify.max_user_instances = 8192
+
+net.core.somaxconn = 32768
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.tcp_fin_timeout    = 30
+
+# etcd & container: kurangi agresivitas writeback
+vm.swappiness            = 0
+vm.dirty_ratio           = 15
+vm.dirty_background_ratio = 5
+
+# kernel hardening dasar (detail CIS ada di infra/vm)
+kernel.kptr_restrict      = 2
+kernel.dmesg_restrict     = 1
+kernel.yama.ptrace_scope  = 1
+fs.protected_hardlinks    = 1
+fs.protected_symlinks     = 1

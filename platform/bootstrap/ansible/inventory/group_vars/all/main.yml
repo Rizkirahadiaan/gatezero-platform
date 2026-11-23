@@ -1,0 +1,80 @@
+---
+# ============================================================================
+# Single source of truth untuk seluruh cluster.
+# Ubah di sini, jangan di role.
+# ============================================================================
+
+# --- identitas cluster -------------------------------------------------------
+cluster_name: gatezero
+
+# --- base image / OS ---------------------------------------------------------
+os_timezone: Asia/Jakarta
+ntp_servers:
+  - ntp1.gatezero.lab
+  - ntp2.gatezero.lab
+
+# --- versi Kubernetes (PIN, jangan pakai "latest") ---------------------------
+# k8s_version     -> dipakai di ClusterConfiguration.kubernetesVersion
+# k8s_pkg_version -> versi paket apt (cek: apt-cache madison kubeadm)
+# k8s_repo_minor  -> jalur repo pkgs.k8s.io
+k8s_version: "1.34.5"
+k8s_pkg_version: "1.34.5-1.1"
+k8s_repo_minor: "1.34"
+
+# --- API endpoint ------------------------------------------------------------
+kubevip_address: "10.10.20.10"
+kubevip_interface: "ens192"
+kubevip_version: "v0.8.7"
+kubevip_port: 6443
+api_dns_name: "k8s-api.gatezero.lab"
+control_plane_endpoint: "{{ kubevip_address }}:{{ kubevip_port }}"
+
+# --- jaringan cluster --------------------------------------------------------
+pod_subnet: "10.244.0.0/16"
+service_subnet: "10.96.0.0/12"
+dns_domain: cluster.local
+
+# --- etcd (hanya control plane) ---------------------------------------------
+# vDisk terpisah. Kalau kosongkan (""), role etcd_disk akan skip
+# dan /var/lib/etcd memakai disk OS (TIDAK disarankan produksi).
+etcd_device: "/dev/sdb"
+etcd_label: "etcd"
+etcd_mount: "/var/lib/etcd"
+
+# --- container runtime -------------------------------------------------------
+containerd_sandbox_image: "registry.k8s.io/pause:3.10"
+containerd_package: "containerd.io"
+
+# Mirror ke Nexus. Default OFF karena mengubah config.toml dan
+# membutuhkan verifikasi manual: containerd config dump.
+nexus_mirror_enabled: false
+nexus_host: "nexus.gatezero.lab"
+nexus_docker_proxy_port: 8083
+nexus_k8s_proxy_port: 8084
+
+# --- CNI / addon -------------------------------------------------------------
+cilium_version: "1.16.5"
+cilium_mtu: 1450            # 1500 - 50 (VXLAN). Jumbo 9000 -> 8950
+gateway_api_version: "v1.2.1"
+cert_manager_version: "v1.16.2"
+metrics_server_version: "3.12.2"
+
+# --- TLS / DNS-01 ------------------------------------------------------------
+acme_email: "ops@gatezero.lab"
+base_domain: "gatezero.lab"
+
+# --- namespace aplikasi (dibuat + dilabeli PSA restricted) -------------------
+app_namespaces:
+  - apps-dev
+  - apps-staging
+  - apps-prod
+
+# --- perilaku ---------------------------------------------------------------
+# Set true kalau ingin role menolak jalan saat ada host unreachable
+strict_mode: true
+
+# --- path & artefak ---------------------------------------------------------
+# inventory_dir = .../ansible/inventory
+artifacts_dir: "{{ inventory_dir }}/../../artifacts"
+kubeconfig_path: "/root/.kube/config"
+cilium_values_file: "{{ inventory_dir }}/../../cilium/values.yaml"

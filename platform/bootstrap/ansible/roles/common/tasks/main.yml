@@ -1,0 +1,142 @@
+---
+# Baseline OS untuk semua node Kubernetes.
+# Semua task idempoten. Handler dijalankan sekali di akhir play.
+
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install paket dasar
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - jq
+      - chrony
+      - nfs-common
+      - open-iscsi
+      - conntrack
+      - socat
+      - ebtables
+      - ethtool
+      - tar
+      - tzdata
+    state: present
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ os_timezone }}"
+
+- name: Aktifkan layanan iscsid (dibutuhkan CSI)
+  ansible.builtin.service:
+    name: iscsid
+    state: started
+    enabled: true
+
+# --- time sync -------------------------------------------------------------
+# Clock drift merusak TLS, etcd, dan CSR. Tidak opsional.
+
+- name: Template konfigurasi chrony
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart chrony
+
+- name: Aktifkan chrony
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: true
+
+# --- swap ------------------------------------------------------------------
+
+- name: Matikan swap sekarang
+  ansible.builtin.command: swapoff -a
+  when: ansible_facts.swaptotal_mb | int > 0
+  changed_when: ansible_facts.swaptotal_mb | int > 0
+
+- name: Comment baris swap di /etc/fstab (persisten)
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#\n]+\sswap\s.*)$'
+    replace: '# \1'
+
+# --- kernel module ---------------------------------------------------------
+
+- name: Load module kernel yang dibutuhkan
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Persist module di modules-load.d
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- sysctl ----------------------------------------------------------------
+
+- name: Template sysctl Kubernetes
+  ansible.builtin.template:
+    src: 99-k8s-sysctl.conf.j2
+    dest: /etc/sysctl.d/99-k8s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload sysctl
+
+# --- resource limit --------------------------------------------------------
+
+- name: Template limit file descriptor & process
+  ansible.builtin.template:
+    src: 99-k8s-limits.conf.j2
+    dest: /etc/security/limits.d/99-k8s.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Template DefaultLimit untuk systemd
+  ansible.builtin.template:
+    src: 99-k8s-system.conf.j2
+    dest: /etc/systemd/system.conf.d/99-k8s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: systemd daemon-reexec
+
+# --- direktori -------------------------------------------------------------
+
+- name: Buat direktori konfigurasi Kubernetes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/kubernetes
+    - /var/log/kubernetes
+
+- name: Pastikan machine-id ada
+  ansible.builtin.stat:
+    path: /etc/machine-id
+  register: machine_id
+
+- name: Peringatkan kalau machine-id kosong (hasil clone buruk)
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ /etc/machine-id tidak ada atau kosong. Regenerate sebelum init:
+      rm -f /etc/machine-id && systemd-machine-id-setup
+  when: not machine_id.stat.exists

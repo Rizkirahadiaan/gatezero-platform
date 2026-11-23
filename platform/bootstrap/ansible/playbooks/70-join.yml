@@ -1,0 +1,18 @@
+---
+# serial: 1 -> satu control plane selesai dulu sebelum berikutnya.
+# etcd tidak suka dua member baru join bersamaan.
+- name: "07a | Join control plane (serial)"
+  hosts: k8s_cp_secondary
+  become: true
+  gather_facts: true
+  serial: 1
+  roles:
+    - kubeadm_join
+
+- name: "07b | Join worker"
+  hosts: k8s_workers
+  become: true
+  gather_facts: true
+  serial: 2
+  roles:
+    - kubeadm_join

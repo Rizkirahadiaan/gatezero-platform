@@ -1,0 +1,59 @@
+# Audit policy — apiserver
+# Dipasang lewat ClusterConfiguration.apiServer.extraArgs + extraVolumes.
+#
+# Prinsip:
+#   - jangan catat read-only yang berisik (heartbeat kubelet, watch)
+#   - catat PERUBAHAN Secret/ConfigMap (tanpa body respons)
+#   - catat LENGKAP perubahan RBAC (siapa memberi hak ke siapa)
+#   - sisanya Metadata saja: cukup untuk forensik, hemat disk
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages:
+  - RequestReceived
+rules:
+  # 1. buang trafik berisik
+  - level: None
+    users: ["system:kube-proxy"]
+    verbs: ["watch"]
+    resources:
+      - group: ""
+        resources: ["endpoints", "services"]
+  - level: None
+    userGroups: ["system:authenticated"]
+    nonResourceURLs:
+      - /api*
+      - /version
+      - /healthz*
+      - /livez*
+      - /readyz*
+      - /openapi*
+
+  # 2. perubahan Secret/ConfigMap: catat isi request
+  - level: Request
+    verbs: ["create", "update", "patch", "delete"]
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps"]
+
+  # 3. perubahan RBAC: catat request + respons
+  - level: RequestResponse
+    verbs: ["create", "update", "patch", "delete"]
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources:
+          - roles
+          - rolebindings
+          - clusterroles
+          - clusterrolebindings
+
+  # 4. escalation & akses istimewa
+  - level: Request
+    verbs: ["create"]
+    resources:
+      - group: ""
+        resources: ["serviceaccounts/token"]
+      - group: "authentication.k8s.io"
+        resources: ["tokenreviews"]
+
+  # 5. default
+  - level: Metadata

@@ -1,0 +1,7 @@
+---
+- name: "01 | Baseline OS (semua node)"
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  roles:
+    - common

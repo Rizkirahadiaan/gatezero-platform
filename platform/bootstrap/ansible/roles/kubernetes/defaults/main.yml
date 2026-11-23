@@ -1,0 +1,4 @@
+---
+k8s_version: "1.34.5"
+k8s_pkg_version: "1.34.5-1.1"
+k8s_repo_minor: "1.34"

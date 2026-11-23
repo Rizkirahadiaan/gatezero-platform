@@ -1,0 +1,137 @@
+---
+# Addon setelah CNI: Gateway API, cert-manager, metrics-server, PSA.
+
+- name: Install CRD Gateway API
+  kubernetes.core.k8s:
+    state: present
+    src: >-
+      https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml
+    kubeconfig: "{{ kubeconfig_path }}"
+    apply: true
+
+- name: Tambah repo Helm jetstack
+  kubernetes.core.helm_repository:
+    name: jetstack
+    repo_url: https://charts.jetstack.io
+
+- name: Install cert-manager
+  kubernetes.core.helm:
+    name: cert-manager
+    chart_ref: jetstack/cert-manager
+    chart_version: "{{ cert_manager_version }}"
+    release_namespace: cert-manager
+    create_namespace: true
+    kubeconfig: "{{ kubeconfig_path }}"
+    values:
+      crds:
+        enabled: true
+      prometheus:
+        enabled: true
+    wait: true
+    timeout: 10m0s
+
+- name: Tambah repo Helm metrics-server
+  kubernetes.core.helm_repository:
+    name: metrics-server
+    repo_url: https://kubernetes-sigs.github.io/metrics-server/
+
+- name: Install metrics-server
+  kubernetes.core.helm:
+    name: metrics-server
+    chart_ref: metrics-server/metrics-server
+    chart_version: "{{ metrics_server_version }}"
+    release_namespace: kube-system
+    kubeconfig: "{{ kubeconfig_path }}"
+    values:
+      args:
+        - --kubelet-preferred-address-types=InternalIP
+    wait: true
+    timeout: 5m0s
+
+# --- namespace aplikasi + Pod Security Admission ---------------------------
+
+- name: Buat namespace aplikasi
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ item }}"
+  loop: "{{ app_namespaces }}"
+
+- name: Labeli namespace dengan PSA restricted
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ item }}"
+        labels:
+          pod-security.kubernetes.io/enforce: restricted
+          pod-security.kubernetes.io/enforce-version: latest
+          pod-security.kubernetes.io/audit: restricted
+          pod-security.kubernetes.io/warn: restricted
+  loop: "{{ app_namespaces }}"
+
+- name: Labeli namespace runner dengan baseline
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: gitlab-runner
+        labels:
+          pod-security.kubernetes.io/enforce: baseline
+
+# --- CSR kubelet ----------------------------------------------------------
+# serverTLSBootstrap:true membuat kubelet mengajukan CSR sendiri.
+
+- name: Setujui CSR kubelet-serving yang menunggu
+  ansible.builtin.shell: |
+    set -eu
+    kubectl get csr -o json \
+      | jq -r '.items[]
+          | select(.spec.signerName=="kubernetes.io/kubelet-serving")
+          | select(.status.conditions == null)
+          | .metadata.name' \
+      | xargs -r kubectl certificate approve
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: csr_approve
+  changed_when: csr_approve.stdout | trim != ''
+  failed_when: false
+
+# --- bersih-bersih --------------------------------------------------------
+
+- name: Hapus Secret kubeadm-certs (berisi certificate key)
+  kubernetes.core.k8s:
+    state: absent
+    kubeconfig: "{{ kubeconfig_path }}"
+    api_version: v1
+    kind: Secret
+    namespace: kube-system
+    name: kubeadm-certs
+
+- name: Verifikasi Secret kubeadm-certs sudah hilang
+  ansible.builtin.shell: |
+    set -eu
+    if kubectl -n kube-system get secret kubeadm-certs >/dev/null 2>&1; then
+      echo PRESENT
+    else
+      echo ABSENT
+    fi
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: certs_secret
+  changed_when: false
+  failed_when: certs_secret.stdout | trim != 'ABSENT'

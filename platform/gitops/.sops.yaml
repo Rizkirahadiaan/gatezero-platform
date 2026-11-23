@@ -1,0 +1,45 @@
+# SOPS configuration — gatezero-platform
+#
+# Catatan penting:
+#   `sops` mencari .sops.yaml ke folder ATAS dari file yang dienkripsi.
+#   Karena file ini ada di platform/gitops/, hanya file di bawah
+#   platform/gitops/ yang memakai aturan ini.
+#   File bootstrap punya aturan sendiri di platform/bootstrap/.sops.yaml.
+#
+#   Path di `path_regex` ditulis toleran: `(^|/)overlays/dev/...` supaya cocok
+#   baik saat dipanggil dari root repo maupun dari dalam platform/gitops/.
+#
+#   Ganti semua age1...PLACEHOLDER dengan public key asli hasil `age-keygen`.
+#   PRIVATE key TIDAK PERNAH masuk repo.
+#
+# Hierarki key (lihat docs/adr/0005):
+#   root    -> offline, hanya untuk bootstrap/  (age1ROOT_PLACEHOLDER)
+#   ci      -> disimpan di OpenBao, dipakai pipeline
+#   prod    -> dipakai ArgoCD di cluster produksi
+#   team    -> rotasi berkala, anggota tim
+#
+# Perintah umum:
+#   sops -e -i overlays/dev/x.yaml          # enkripsi in-place
+#   sops -d overlays/dev/x.yaml             # dekripsi ke stdout
+#   sops edit overlays/prod/x.yaml          # edit terenkripsi
+#   sops updatekeys overlays/prod/*.yaml    # setelah anggota tim berubah
+#   sops rotate -i overlays/prod/x.yaml     # rotasi data key
+#   sops filestatus overlays/prod/*.yaml    # cek status enkripsi
+
+creation_rules:
+  # --- dev: hanya tim platform ---
+  - path_regex: (^|/)overlays/dev/.*\.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1DEV_PLACEHOLDER_REPLACE_ME
+
+  # --- staging: tim platform + QA ---
+  - path_regex: (^|/)overlays/staging/.*\.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1DEV_PLACEHOLDER_REPLACE_ME,age1QA_PLACEHOLDER_REPLACE_ME
+
+  # --- prod: key prod (di cluster) + key root (break-glass) ---
+  # encrypted_regex sengaja dibatasi ke data/stringData supaya metadata
+  # (name, namespace, labels) tetap plaintext -> diff ArgoCD tetap terbaca.
+  - path_regex: (^|/)overlays/prod/.*\.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1PROD_PLACEHOLDER_REPLACE_ME,age1ROOT_PLACEHOLDER_REPLACE_ME

@@ -1,0 +1,25 @@
+# SOPS configuration — bootstrap cluster
+#
+# File ini SENGAJA terpisah dari platform/gitops/.sops.yaml.
+# Alasan: `sops` mencari .sops.yaml ke folder ATAS dari file yang dienkripsi.
+# File di platform/bootstrap/ tidak akan pernah menemukan aturan yang ada di
+# platform/gitops/, jadi aturan bootstrap harus tinggal di sini.
+#
+# Key level ini adalah **root key** (offline). Hanya dipakai untuk material
+# rahasia yang dibutuhkan sebelum cluster ada:
+#   - kubeadm certificate-key
+#   - bootstrap token / discovery kubeconfig
+#   - admin kubeconfig sementara
+#
+# Perintah:
+#   age-keygen -o ~/.config/sops/age/root.txt
+#   age-keygen -y ~/.config/sops/age/root.txt     # -> public key
+#   sops -e -i kubeadm/bootstrap-token.enc.yaml
+#   sops exec-file kubeadm/bootstrap-token.enc.yaml 'kubeadm join --discovery-file {}'
+#
+# CATATAN: tidak memakai encrypted_regex. Untuk file YAML non-Kubernetes-Secret
+# kita ingin SELURUH value dienkripsi, bukan hanya data/stringData.
+
+creation_rules:
+  - path_regex: (^|/)bootstrap/.*\.enc\.yaml$
+    age: age1ROOT_PLACEHOLDER_REPLACE_ME

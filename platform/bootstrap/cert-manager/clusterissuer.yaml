@@ -1,0 +1,65 @@
+# cert-manager: ClusterIssuer (Let's Encrypt via DNS-01) + wildcard certificate
+#
+# DNS-01 dipilih karena cluster berada di jaringan privat (ADR/bootstrap).
+# Secret `cloudflare-api-token` harus dibuat dari SOPS:
+#
+#   sops exec-file cert-manager/cloudflare-token.enc.yaml \
+#     'kubectl create secret generic cloudflare-api-token \
+#        --namespace cert-manager --from-file=api-token={} \
+#        --dry-run=client -o yaml | kubectl apply -f -'
+#
+# Ganti email & domain sesuai milikmu.
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-dns
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ops@gatezero.lab
+    privateKeySecretRef:
+      name: letsencrypt-dns-account
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        selector:
+          dnsZones:
+            - gatezero.lab
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: ops@gatezero.lab
+    privateKeySecretRef:
+      name: letsencrypt-staging-account
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        selector:
+          dnsZones:
+            - gatezero.lab
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-gatezero
+  namespace: cert-manager
+spec:
+  secretName: wildcard-gatezero-tls
+  issuerRef:
+    name: letsencrypt-dns
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.apps.gatezero.lab"
+    - "apps.gatezero.lab"

@@ -1,0 +1,7 @@
+---
+- name: "05 | VIP API server (kube-vip)"
+  hosts: k8s_control_plane
+  become: true
+  gather_facts: true
+  roles:
+    - kubevip

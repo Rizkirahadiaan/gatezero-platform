@@ -1,0 +1,139 @@
+---
+# Verifikasi cluster. Semua task di sini READ-ONLY dan akan menggagalkan
+# play kalau ada yang tidak sesuai.
+
+- name: Kumpulkan status node
+  ansible.builtin.command: kubectl get nodes -o wide
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: v_nodes
+  changed_when: false
+
+- name: Tampilkan node
+  ansible.builtin.debug:
+    msg: "{{ v_nodes.stdout_lines }}"
+
+- name: Hitung node Ready
+  ansible.builtin.shell: |
+    set -eu
+    kubectl get nodes --no-headers | awk '$2=="Ready"{c++} END{print c+0}'
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: v_ready
+  changed_when: false
+
+- name: Pastikan SEMUA node Ready
+  ansible.builtin.assert:
+    that:
+      - v_ready.stdout | int == (groups['k8s_control_plane'] | length) + (groups['k8s_workers'] | length)
+    fail_msg: "Hanya {{ v_ready.stdout }} node Ready dari {{ (groups['k8s_control_plane'] | length) + (groups['k8s_workers'] | length) }}"
+    success_msg: "{{ v_ready.stdout }} node Ready"
+
+- name: Pastikan tidak ada pod system yang tidak sehat
+  ansible.builtin.shell: |
+    set -eu
+    bad=$(kubectl -n kube-system get pods --no-headers \
+      | grep -Ev 'Running|Completed' | wc -l)
+    echo "$bad"
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: v_badsys
+  changed_when: false
+
+- name: Gagal kalau ada pod kube-system tidak sehat
+  ansible.builtin.assert:
+    that:
+      - v_badsys.stdout | int == 0
+    fail_msg: "{{ v_badsys.stdout }} pod kube-system tidak Running. Cek: kubectl -n kube-system get pods"
+    success_msg: "Semua pod kube-system sehat"
+
+- name: Cek quorum etcd
+  ansible.builtin.command: >-
+    etcdctl
+    --endpoints={% for h in groups['k8s_control_plane'] %}https://{{ hostvars[h]['ansible_host'] }}:2379{{ '' if loop.last else ',' }}{% endfor %}
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt
+    --cert=/etc/kubernetes/pki/etcd/server.crt
+    --key=/etc/kubernetes/pki/etcd/server.key
+    endpoint health -w table
+  environment:
+    ETCDCTL_API: "3"
+  register: v_etcd
+  changed_when: false
+  failed_when: false
+
+- name: Tampilkan kesehatan etcd
+  ansible.builtin.debug:
+    msg: "{{ v_etcd.stdout_lines | default([v_etcd.stderr]) }}"
+
+- name: Gagal kalau ada endpoint etcd tidak sehat
+  ansible.builtin.assert:
+    that:
+      - v_etcd.stdout is search('unhealthy') == false
+    fail_msg: "etcd tidak sehat. Jangan lanjut sebelum quorum pulih."
+    success_msg: "Semua endpoint etcd healthy"
+
+- name: Cek masa berlaku sertifikat
+  ansible.builtin.command: kubeadm certs check-expiration
+  register: v_certs
+  changed_when: false
+
+- name: Tampilkan sertifikat
+  ansible.builtin.debug:
+    msg: "{{ v_certs.stdout_lines | select('search', 'CERTIFICATE|CA|expires') | list }}"
+
+- name: Pastikan encryption at rest aktif di argumen apiserver
+  ansible.builtin.shell: |
+    set -eu
+    kubectl -n kube-system get pod -l component=kube-apiserver \
+      -o jsonpath='{.items[0].spec.containers[0].command}' \
+      | grep -q encryption-provider-config && echo YES || echo NO
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: v_enc
+  changed_when: false
+  failed_when: v_enc.stdout | trim != 'YES'
+
+- name: Pastikan metrics-server melayani
+  ansible.builtin.command: kubectl top nodes
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: v_metrics
+  changed_when: false
+  retries: 10
+  delay: 15
+  until: v_metrics.rc == 0
+
+- name: Tampilkan penggunaan resource
+  ansible.builtin.debug:
+    msg: "{{ v_metrics.stdout_lines }}"
+
+- name: Cek CIDR tidak tumpang tindih dengan jaringan host
+  ansible.builtin.shell: |
+    set -eu
+    hostnet=$(ip -4 addr show scope global | awk '/inet /{print $2}' | cut -d/ -f1 | head -1)
+    case "$hostnet" in
+      10.244.*) echo "OVERLAP-POD" ;;
+      10.96.*|10.97.*|10.98.*|10.99.*|10.10[0-9].*) echo "OVERLAP-SVC" ;;
+      *) echo OK ;;
+    esac
+  args:
+    executable: /bin/bash
+  register: v_cidr
+  changed_when: false
+  failed_when: v_cidr.stdout is not search('^OK')
+
+- name: Ringkasan akhir
+  ansible.builtin.debug:
+    msg:
+      - "Cluster : {{ cluster_name }}"
+      - "Versi   : {{ k8s_version }}"
+      - "Node    : {{ v_ready.stdout }}/{{ (groups['k8s_control_plane'] | length) + (groups['k8s_workers'] | length) }} Ready"
+      - "etcd    : {{ 'healthy' if v_etcd.stdout is not search('unhealthy') else 'UNHEALTHY' }}"
+      - "VIP     : {{ kubevip_address }}:{{ kubevip_port }}"
+      - "Langkah berikutnya: ArgoCD (platform/gitops)"

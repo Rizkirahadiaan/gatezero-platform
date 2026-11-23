@@ -1,0 +1,4 @@
+---
+# Batas versi ansible-core. Modul yang dipakai butuh >= 2.16
+# (apt_repository, dpkg_selections, deb822).
+requires_ansible: ">=2.16.0"

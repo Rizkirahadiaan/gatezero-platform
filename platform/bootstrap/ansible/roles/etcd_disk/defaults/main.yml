@@ -1,0 +1,5 @@
+---
+# Kosong = lewati role (pakai disk OS untuk /var/lib/etcd — tidak disarankan produksi)
+etcd_device: ""
+etcd_label: etcd
+etcd_mount: /var/lib/etcd

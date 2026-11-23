@@ -1,0 +1,38 @@
+---
+- name: "00 | Preflight — validasi controller & secret"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Cek ansible-core versi minimum
+      ansible.builtin.assert:
+        that:
+          - ansible_version.full is version('2.16', '>=')
+        fail_msg: >-
+          Butuh ansible-core >= 2.16 (modul apt_repository & dpkg_selections).
+          Versi sekarang: {{ ansible_version.full }}
+        success_msg: "ansible-core {{ ansible_version.full }} OK"
+
+    - name: Cek secret dari environment (didekripsi SOPS)
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'K8S_CERT_KEY') | length == 64
+          - lookup('env', 'K8S_ENCRYPTION_KEY') | length >= 44
+        fail_msg: >-
+          K8S_CERT_KEY / K8S_ENCRYPTION_KEY belum terisi.
+          Jalankan lewat ./run.sh (sops exec-env), bukan ansible-playbook langsung.
+        success_msg: "Secret bootstrap tersedia di environment"
+
+    - name: Catatan dependensi
+      ansible.builtin.debug:
+        msg:
+          - "Pastikan koleksi terpasang:"
+          - "  ansible-galaxy collection install -r requirements.yml"
+          - "(kubernetes.core, ansible.posix, community.general)"
+
+    - name: Tampilkan target
+      ansible.builtin.debug:
+        msg: >-
+          Target: {{ groups['k8s_control_plane'] | length }} control plane +
+          {{ groups['k8s_workers'] | length }} worker |
+          VIP {{ kubevip_address }} | k8s {{ k8s_version }}

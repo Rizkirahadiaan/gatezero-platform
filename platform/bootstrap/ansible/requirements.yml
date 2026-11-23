@@ -1,0 +1,10 @@
+---
+# Install: ansible-galaxy collection install -r requirements.yml
+# Butuh ansible-core >= 2.16 (modul apt_repository, deb822, dpkg_selections)
+collections:
+  - name: kubernetes.core
+    version: ">=5.0.0"
+  - name: ansible.posix
+    version: ">=1.5.0"
+  - name: community.general
+    version: ">=9.0.0"

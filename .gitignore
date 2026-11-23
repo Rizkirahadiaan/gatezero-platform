@@ -1,0 +1,59 @@
+# --- Secret: JANGAN PERNAH commit ---
+*.dec.yaml
+*.dec.yml
+*.decrypted.*
+age.key
+keys.txt
+*.agekey
+.env
+.env.*
+!.env.example
+.sops-key.txt
+kubeconfig
+*.kubeconfig
+admin.conf
+
+# --- Go ---
+bin/
+dist/
+vendor/
+*.exe
+*.test
+*.out
+coverage.txt
+
+# --- Node (bila dipakai) ---
+node_modules/
+.npm/
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+
+# --- Artefak scan (hasil runtime, bukan baseline) ---
+trivy-report.json
+sbom-*.json
+sbom-*.spdx
+kube-bench-*.log
+kubescape-*.json
+lynis-report.dat
+scap-results.xml
+
+# --- Build & tooling ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+.tmp/
+cache/
+.pre-commit-cache/
+
+# --- ansible ----------
+*.retry
+.ansible/
+platform/bootstrap/artifacts/
+platform/bootstrap/ansible/secrets.env
+platform/bootstrap/ansible/inventory/hosts.local.yml
+platform/bootstrap/ansible/*.tar.gz

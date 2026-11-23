@@ -1,0 +1,9 @@
+---
+cilium_version: "1.16.5"
+cilium_mtu: 1450
+# Kosong = pakai nilai bawaan chart (tanpa values file)
+cilium_values_file: ""
+cluster_name: kubernetes
+kubevip_address: "192.168.1.100"
+kubevip_port: 6443
+kubeconfig_path: /root/.kube/config

@@ -1,0 +1,55 @@
+---
+# Metadata koleksi Ansible Galaxy.
+#
+# Build:   ansible-galaxy collection build --force
+# Publish: ansible-galaxy collection publish ./gatezero-kubeadm_bootstrap-*.tar.gz \
+#            --api-key "$ANSIBLE_GALAXY_API_KEY"
+#
+# ⚠️ namespace HARUS sama dengan username/namespace akun Galaxy kamu.
+#    Ganti "gatezero" di bawah sebelum publish.
+namespace: gatezero
+name: kubeadm_bootstrap
+version: 0.1.0
+readme: README.md
+authors:
+  - gatezero platform team <ops@gatezero.lab>
+description: >-
+  Production-grade Kubernetes bootstrap dengan kubeadm HA: baseline OS, etcd di
+  vDisk terpisah, containerd (v2/v3 aware), kube-vip, Cilium tanpa kube-proxy,
+  Gateway API, cert-manager, metrics-server, Pod Security Admission, dan
+  verifikasi end-to-end. Setiap role idempoten dan menolak langkah berisiko
+  (format disk berisi data, CIDR overlap, versi paket tidak tersedia).
+license:
+  - MIT
+tags:
+  - kubernetes
+  - kubeadm
+  - devops
+  - platform
+  - devsecops
+  - cilium
+  - high_availability
+  - infrastructure
+dependencies:
+  kubernetes.core: ">=5.0.0"
+  ansible.posix: ">=1.5.0"
+  community.general: ">=9.0.0"
+repository: https://gitlab.gatezero.lab/platform/gatezero-platform
+documentation: https://gitlab.gatezero.lab/platform/gatezero-platform/-/blob/main/platform/bootstrap/ansible/README.md
+homepage: https://gitlab.gatezero.lab/platform/gatezero-platform
+issues: https://gitlab.gatezero.lab/platform/gatezero-platform/-/issues
+
+# JANGAN ikutkan hal yang bersifat site-specific atau rahasia.
+build_ignore:
+  - artifacts
+  - inventory
+  - secrets.env
+  - secrets.env.enc
+  - secrets.env.example
+  - run.sh
+  - ansible.cfg
+  - .ansible-lint
+  - "*.tar.gz"
+  - "*.retry"
+  - ".cache"
+  - "__pycache__"

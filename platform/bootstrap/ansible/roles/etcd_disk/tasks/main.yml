@@ -1,0 +1,104 @@
+---
+# vDisk etcd terpisah (ADR-0009).
+#
+# Prinsip: JANGAN pernah memformat device yang sudah punya filesystem lain.
+# Lebih baik gagal dengan pesan jelas daripada menghapus data.
+
+- name: Skip kalau etcd_device tidak didefinisikan
+  ansible.builtin.meta: end_host
+  when: etcd_device | default('') | length == 0
+
+- name: Cek device etcd ada
+  ansible.builtin.stat:
+    path: "{{ etcd_device }}"
+  register: etcd_dev
+
+- name: Gagal kalau device tidak ada
+  ansible.builtin.assert:
+    that:
+      - etcd_dev.stat.exists
+    fail_msg: >-
+      {{ etcd_device }} tidak ditemukan. Cek 'lsblk' di {{ inventory_hostname }}
+      dan sesuaikan etcd_device di inventory/group_vars/all/main.yml
+
+- name: Pastikan etcd_device bukan bagian dari disk sistem
+  ansible.builtin.shell: |
+    set -eu
+    root_src=$(findmnt -n -o SOURCE / || true)
+    root_disk=$(lsblk -no PKNAME "$root_src" 2>/dev/null || true)
+    etcd_disk=$(lsblk -no PKNAME {{ etcd_device }} 2>/dev/null || true)
+    if [ -z "$etcd_disk" ]; then
+      etcd_disk=$(basename {{ etcd_device }})
+    fi
+    if [ -n "$root_disk" ] && [ "$root_disk" = "$etcd_disk" ]; then
+      echo SAME
+    else
+      echo DIFFERENT
+    fi
+  args:
+    executable: /bin/bash
+  register: disk_safety
+  changed_when: false
+
+- name: Batalkan kalau etcd_device ada di disk yang sama dengan /
+  ansible.builtin.fail:
+    msg: >-
+      etcd_device={{ etcd_device }} berada di disk yang sama dengan filesystem root.
+      Ini akan menghapus OS. Perbaiki etcd_device di group_vars.
+  when: disk_safety.stdout is search('SAME')
+
+- name: Baca filesystem yang sudah ada
+  ansible.builtin.command: blkid -o value -s TYPE {{ etcd_device }}
+  register: etcd_fs
+  changed_when: false
+  failed_when: false
+
+- name: Baca label yang sudah ada
+  ansible.builtin.command: blkid -o value -s LABEL {{ etcd_device }}
+  register: etcd_label_now
+  changed_when: false
+  failed_when: false
+
+- name: Tolak device yang sudah berisi filesystem lain
+  ansible.builtin.fail:
+    msg: >-
+      {{ etcd_device }} sudah punya filesystem '{{ etcd_fs.stdout }}'
+      dengan label '{{ etcd_label_now.stdout }}'.
+      Diharapkan label '{{ etcd_label }}'. Periksa manual — role ini tidak
+      akan memformat ulang data yang sudah ada.
+  when:
+    - etcd_fs.stdout | default('') | trim != ''
+    - etcd_label_now.stdout | default('') | trim != etcd_label
+
+- name: Format vDisk etcd (hanya jika benar-benar kosong)
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ etcd_device }}"
+    opts: "-L {{ etcd_label }}"
+    force: false
+  when: etcd_fs.stdout | default('') | trim == ''
+
+- name: Buat mount point
+  ansible.builtin.file:
+    path: "{{ etcd_mount }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Mount via LABEL (bukan /dev/sdX)
+  ansible.posix.mount:
+    path: "{{ etcd_mount }}"
+    src: "LABEL={{ etcd_label }}"
+    fstype: ext4
+    opts: defaults,noatime
+    state: mounted
+
+- name: Verifikasi mount
+  ansible.builtin.command: findmnt -n -o SOURCE,FSTYPE,OPTIONS {{ etcd_mount }}
+  register: etcd_mnt
+  changed_when: false
+
+- name: Tampilkan hasil mount
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: {{ etcd_mnt.stdout }}"
